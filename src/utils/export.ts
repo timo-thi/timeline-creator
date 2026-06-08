@@ -1,3 +1,5 @@
+import { toBlob as nodeToBlob } from 'html-to-image'
+
 export type ExportImageFormat = 'png' | 'jpg' | 'svg'
 
 /**
@@ -29,6 +31,7 @@ export function serializeSvg(svg: SVGSVGElement, includeBackground: boolean) {
  */
 export async function exportSvgElement(
   svg: SVGSVGElement,
+  exportNode: HTMLElement | null,
   format: ExportImageFormat,
   filename: string,
   includeBackground: boolean,
@@ -41,41 +44,59 @@ export async function exportSvgElement(
     return
   }
 
-  const svgBlob = new Blob([serialized], { type: 'image/svg+xml;charset=utf-8' })
-  const objectUrl = URL.createObjectURL(svgBlob)
+  const blob = await exportRasterFromNode(
+    exportNode ?? svg,
+    format,
+    includeBackground,
+    backgroundColor,
+  )
+  downloadBlob(`${filename}.${format}`, blob)
+}
+
+async function exportRasterFromNode(
+  node: HTMLElement | SVGSVGElement,
+  format: 'png' | 'jpg',
+  includeBackground: boolean,
+  backgroundColor: string,
+) {
+  const target = ensureHtmlExportTarget(node, includeBackground, backgroundColor)
+  const width = Math.ceil(target.clientWidth || target.scrollWidth)
+  const height = Math.ceil(target.clientHeight || target.scrollHeight)
 
   try {
-    const image = await loadImage(objectUrl)
-    const width = Number(svg.getAttribute('width')) || svg.viewBox.baseVal.width
-    const height = Number(svg.getAttribute('height')) || svg.viewBox.baseVal.height
-    const canvas = document.createElement('canvas')
-    canvas.width = Math.ceil(width)
-    canvas.height = Math.ceil(height)
-    const context = canvas.getContext('2d')
+    const blob = await nodeToBlob(target, {
+      cacheBust: true,
+      pixelRatio: 2,
+      canvasWidth: Math.ceil(width) * 2,
+      canvasHeight: Math.ceil(height) * 2,
+      backgroundColor: format === 'jpg' ? backgroundColor : includeBackground ? backgroundColor : undefined,
+      filter: (currentNode) => {
+        if (!includeBackground && currentNode instanceof Element) {
+          return !currentNode.matches('[data-export-background="true"]')
+        }
 
-    if (!context) {
-      throw new Error('Canvas export is not available in this browser.')
-    }
-
-    if (format === 'jpg' || includeBackground) {
-      context.fillStyle = includeBackground ? backgroundColor : '#ffffff'
-      context.fillRect(0, 0, canvas.width, canvas.height)
-    }
-
-    context.drawImage(image, 0, 0, canvas.width, canvas.height)
-
-    const mimeType = format === 'jpg' ? 'image/jpeg' : 'image/png'
-    const blob = await new Promise<Blob | null>((resolve) =>
-      canvas.toBlob(resolve, mimeType, format === 'jpg' ? 0.94 : undefined),
-    )
+        return true
+      },
+    })
 
     if (!blob) {
-      throw new Error('Canvas export failed to produce an image.')
+      throw new Error(`Failed to create ${format.toUpperCase()} export.`)
     }
 
-    downloadBlob(`${filename}.${format}`, blob)
+    if (format === 'jpg' && blob.type !== 'image/jpeg') {
+      return convertBlobFormat(blob, Math.ceil(width), Math.ceil(height), 'image/jpeg')
+    }
+
+    return blob
+  } catch (error) {
+    throw new Error(
+      error instanceof Error ? error.message : `Failed to create ${format.toUpperCase()} export.`,
+      { cause: error },
+    )
   } finally {
-    URL.revokeObjectURL(objectUrl)
+    if (target.dataset.temporaryExportTarget === 'true') {
+      target.remove()
+    }
   }
 }
 
@@ -95,4 +116,62 @@ function loadImage(url: string) {
     image.onerror = () => reject(new Error('Could not load exported SVG for raster conversion.'))
     image.src = url
   })
+}
+
+async function convertBlobFormat(blob: Blob, width: number, height: number, mimeType: string) {
+  const url = URL.createObjectURL(blob)
+
+  try {
+    const image = await loadImage(url)
+    const canvas = document.createElement('canvas')
+    canvas.width = width * 2
+    canvas.height = height * 2
+    const context = canvas.getContext('2d')
+
+    if (!context) {
+      throw new Error('Canvas export is not available in this browser.')
+    }
+
+    context.fillStyle = '#ffffff'
+    context.fillRect(0, 0, canvas.width, canvas.height)
+    context.drawImage(image, 0, 0, canvas.width, canvas.height)
+
+    const converted = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, mimeType, 0.94),
+    )
+
+    if (!converted) {
+      throw new Error('Canvas export failed to produce an image.')
+    }
+
+    return converted
+  } finally {
+    URL.revokeObjectURL(url)
+  }
+}
+
+function ensureHtmlExportTarget(
+  node: HTMLElement | SVGSVGElement,
+  includeBackground: boolean,
+  backgroundColor: string,
+) {
+  if (node instanceof HTMLElement) {
+    return node
+  }
+
+  const width = Number(node.getAttribute('width')) || node.viewBox.baseVal.width
+  const height = Number(node.getAttribute('height')) || node.viewBox.baseVal.height
+  const wrapper = document.createElement('div')
+  wrapper.dataset.temporaryExportTarget = 'true'
+  wrapper.style.position = 'fixed'
+  wrapper.style.left = '-100000px'
+  wrapper.style.top = '0'
+  wrapper.style.width = `${Math.ceil(width)}px`
+  wrapper.style.height = `${Math.ceil(height)}px`
+  wrapper.style.background = includeBackground ? backgroundColor : 'transparent'
+  wrapper.style.pointerEvents = 'none'
+  wrapper.style.lineHeight = '0'
+  wrapper.appendChild(node.cloneNode(true))
+  document.body.appendChild(wrapper)
+  return wrapper
 }

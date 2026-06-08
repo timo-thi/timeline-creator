@@ -80,30 +80,22 @@ export function computeTimelineLayout(document: TimelineDocument): TimelineLayou
   }
 
   const segments = buildSegments(direction, segmentLength, segmentCount, lanesPerSegment)
-  const events = pending.map((item) =>
+  const rawEvents = pending.map((item) =>
     direction === 'horizontal'
       ? finalizeHorizontalEvent(item, segments[item.segmentIndex])
       : finalizeVerticalEvent(item, segments[item.segmentIndex]),
   )
-  const ticks = buildTicks(document, segments, minDate, maxDate, timelineLength, segmentLength)
-
-  const width =
-    direction === 'horizontal'
-      ? OUTER_PADDING * 2 + segmentLength
-      : segments[segments.length - 1].axisEndX + OUTER_PADDING
-  const height =
-    direction === 'horizontal'
-      ? segments[segments.length - 1].axisEndY + OUTER_PADDING
-      : OUTER_PADDING * 2 + segmentLength
+  const rawTicks = buildTicks(document, segments, minDate, maxDate, timelineLength, segmentLength)
+  const normalized = normalizeLayoutBounds(document, segments, rawEvents, rawTicks)
 
   return {
-    width,
-    height,
+    width: normalized.width,
+    height: normalized.height,
     minDate,
     maxDate,
-    segments,
-    ticks,
-    events,
+    segments: normalized.segments,
+    ticks: normalized.ticks,
+    events: normalized.events,
   }
 }
 
@@ -435,4 +427,81 @@ function estimateCardHeight(event: TimelineEvent, cardWidth: number) {
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value))
+}
+
+function normalizeLayoutBounds(
+  document: TimelineDocument,
+  segments: SegmentLayout[],
+  events: EventLayout[],
+  ticks: TickLayout[],
+) {
+  let minX = Number.POSITIVE_INFINITY
+  let minY = Number.POSITIVE_INFINITY
+  let maxX = Number.NEGATIVE_INFINITY
+  let maxY = Number.NEGATIVE_INFINITY
+
+  const tickLabelWidth = document.settings.direction === 'horizontal' ? 80 : 120
+  const tickLabelHeight = 28
+
+  for (const segment of segments) {
+    minX = Math.min(minX, segment.axisStartX, segment.axisEndX)
+    minY = Math.min(minY, segment.axisStartY, segment.axisEndY)
+    maxX = Math.max(maxX, segment.axisStartX, segment.axisEndX)
+    maxY = Math.max(maxY, segment.axisStartY, segment.axisEndY)
+  }
+
+  for (const event of events) {
+    minX = Math.min(minX, event.anchorX)
+    minY = Math.min(minY, event.anchorY)
+    maxX = Math.max(maxX, event.anchorX + event.cardWidth)
+    maxY = Math.max(maxY, event.anchorY + event.cardHeight)
+  }
+
+  for (const tick of ticks) {
+    if (document.settings.direction === 'horizontal') {
+      minX = Math.min(minX, tick.x - tickLabelWidth / 2)
+      minY = Math.min(minY, tick.y - tickLabelHeight)
+      maxX = Math.max(maxX, tick.x + tickLabelWidth / 2)
+      maxY = Math.max(maxY, tick.y + 16)
+      continue
+    }
+
+    minX = Math.min(minX, tick.x - tickLabelWidth)
+    minY = Math.min(minY, tick.y - 14)
+    maxX = Math.max(maxX, tick.x + 16)
+    maxY = Math.max(maxY, tick.y + 14)
+  }
+
+  const offsetX = OUTER_PADDING - minX
+  const offsetY = OUTER_PADDING - minY
+  const width = Math.ceil(maxX - minX + OUTER_PADDING * 2)
+  const height = Math.ceil(maxY - minY + OUTER_PADDING * 2)
+
+  return {
+    width,
+    height,
+    segments: segments.map((segment) => ({
+      ...segment,
+      axisStartX: segment.axisStartX + offsetX,
+      axisStartY: segment.axisStartY + offsetY,
+      axisEndX: segment.axisEndX + offsetX,
+      axisEndY: segment.axisEndY + offsetY,
+      mainStart: segment.mainStart + offsetX,
+      mainEnd: segment.mainEnd + offsetX,
+    })),
+    events: events.map((event) => ({
+      ...event,
+      x: event.x + offsetX,
+      y: event.y + offsetY,
+      anchorX: event.anchorX + offsetX,
+      anchorY: event.anchorY + offsetY,
+      pointX: event.pointX + offsetX,
+      pointY: event.pointY + offsetY,
+    })),
+    ticks: ticks.map((tick) => ({
+      ...tick,
+      x: tick.x + offsetX,
+      y: tick.y + offsetY,
+    })),
+  }
 }

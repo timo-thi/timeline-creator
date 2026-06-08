@@ -115,7 +115,12 @@ events:
 
 ## Code structure
 
-- [src/App.tsx](/home/sptim/Projects/TimelineCreator/src/App.tsx): editor, preview, drag handling, import/export wiring
+- [src/App.tsx](/home/sptim/Projects/TimelineCreator/src/App.tsx): top-level state orchestration and feature wiring
+- [src/components/ControlPanel.tsx](/home/sptim/Projects/TimelineCreator/src/components/ControlPanel.tsx): timeline settings, event list, import/export controls
+- [src/components/StagePreview.tsx](/home/sptim/Projects/TimelineCreator/src/components/StagePreview.tsx): preview shell and SVG timeline rendering
+- [src/components/EventDrawer.tsx](/home/sptim/Projects/TimelineCreator/src/components/EventDrawer.tsx): focused event editing drawer
+- [src/lib/document.ts](/home/sptim/Projects/TimelineCreator/src/lib/document.ts): document creation, normalization, date/input helpers
+- [src/lib/svg.ts](/home/sptim/Projects/TimelineCreator/src/lib/svg.ts): SVG coordinate conversion helpers
 - [src/types.ts](/home/sptim/Projects/TimelineCreator/src/types.ts): document and layout types
 - [src/sampleData.ts](/home/sptim/Projects/TimelineCreator/src/sampleData.ts): starter forensic timeline
 - [src/utils/timeline.ts](/home/sptim/Projects/TimelineCreator/src/utils/timeline.ts): automatic layout and dependency routing
