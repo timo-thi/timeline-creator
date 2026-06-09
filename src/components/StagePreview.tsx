@@ -151,27 +151,53 @@ function StagePreview({
           {documentState.settings.showGrid
             ? layout.secondaryTicks.map((tick) =>
                 documentState.settings.direction === 'horizontal' ? (
-                  <line
-                    key={tick.id}
-                    x1={tick.x}
-                    y1={tick.y - 6}
-                    x2={tick.x}
-                    y2={tick.y + 6}
-                    stroke={documentState.settings.theme.grid}
-                    strokeWidth="1"
-                    opacity="0.75"
-                  />
+                  <g key={tick.id}>
+                    <line
+                      x1={tick.x}
+                      y1={tick.y - 6}
+                      x2={tick.x}
+                      y2={tick.y + 6}
+                      stroke={documentState.settings.theme.grid}
+                      strokeWidth="1"
+                      opacity="0.75"
+                    />
+                    {documentState.settings.showSecondaryTickLabels ? (
+                      <text
+                        x={tick.x}
+                        y={tick.y + 18}
+                        textAnchor="middle"
+                        fill={documentState.settings.theme.inkMuted}
+                        fontSize="9"
+                        opacity="0.8"
+                      >
+                        {tick.label}
+                      </text>
+                    ) : null}
+                  </g>
                 ) : (
-                  <line
-                    key={tick.id}
-                    x1={tick.x - 6}
-                    y1={tick.y}
-                    x2={tick.x + 6}
-                    y2={tick.y}
-                    stroke={documentState.settings.theme.grid}
-                    strokeWidth="1"
-                    opacity="0.75"
-                  />
+                  <g key={tick.id}>
+                    <line
+                      x1={tick.x - 6}
+                      y1={tick.y}
+                      x2={tick.x + 6}
+                      y2={tick.y}
+                      stroke={documentState.settings.theme.grid}
+                      strokeWidth="1"
+                      opacity="0.75"
+                    />
+                    {documentState.settings.showSecondaryTickLabels ? (
+                      <text
+                        x={tick.x + 12}
+                        y={tick.y + 3}
+                        textAnchor="start"
+                        fill={documentState.settings.theme.inkMuted}
+                        fontSize="9"
+                        opacity="0.8"
+                      >
+                        {tick.label}
+                      </text>
+                    ) : null}
+                  </g>
                 ),
               )
             : null}

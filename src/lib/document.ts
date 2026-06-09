@@ -80,6 +80,10 @@ export function normalizeDocument(input: unknown): TimelineDocument {
       secondaryTickUnit: isFinerTickUnit(settings.secondaryTickUnit, settings.majorTickUnit)
         ? settings.secondaryTickUnit
         : undefined,
+      showSecondaryTickLabels:
+        typeof settings.showSecondaryTickLabels === 'boolean'
+          ? settings.showSecondaryTickLabels
+          : false,
       cardWidth:
         typeof settings.cardWidth === 'number'
           ? settings.cardWidth
@@ -299,6 +303,10 @@ function normalizeZoomSection(
       typeof parsed.lineCount === 'number' && Number.isFinite(parsed.lineCount)
         ? clampLineCount(parsed.lineCount)
         : fallbackSettings.lineCount,
+    showSecondaryTickLabels:
+      typeof parsed.showSecondaryTickLabels === 'boolean'
+        ? parsed.showSecondaryTickLabels
+        : fallbackSettings.showSecondaryTickLabels,
     offsets,
   }
 }

@@ -519,7 +519,7 @@ function buildSecondaryTicks(
           document.settings.direction === 'horizontal'
             ? segment.axisStartY
             : segment.axisStartY + pointOffset,
-        label: '',
+        label: formatSecondaryTickDate(timestamp, unit),
       }
     })
 }
@@ -694,6 +694,33 @@ function getMajorTickTimestamps(start: number, end: number, unit: TimelineTickUn
   }
 
   return ticks
+}
+
+function formatSecondaryTickDate(timestamp: number, unit: TimelineTickUnit) {
+  if (unit === 'hour') {
+    return new Intl.DateTimeFormat(undefined, {
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(timestamp)
+  }
+
+  if (unit === 'day') {
+    return new Intl.DateTimeFormat(undefined, { day: 'numeric' }).format(timestamp)
+  }
+
+  if (unit === 'week') {
+    return `W${getIsoWeekNumber(new Date(timestamp))}`
+  }
+
+  return new Intl.DateTimeFormat(undefined, { month: 'short' }).format(timestamp)
+}
+
+function getIsoWeekNumber(date: Date) {
+  const utcDate = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+  const day = utcDate.getUTCDay() || 7
+  utcDate.setUTCDate(utcDate.getUTCDate() + 4 - day)
+  const yearStart = new Date(Date.UTC(utcDate.getUTCFullYear(), 0, 1))
+  return Math.ceil(((utcDate.getTime() - yearStart.getTime()) / 86_400_000 + 1) / 7)
 }
 
 function isFinerTickUnit(secondary: TimelineTickUnit, major: TimelineTickUnit) {

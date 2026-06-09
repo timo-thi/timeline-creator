@@ -11,6 +11,7 @@ export const defaultTimeline: TimelineDocument = {
     lineCount: 2,
     majorTickUnit: 'hour',
     secondaryTickUnit: undefined,
+    showSecondaryTickLabels: false,
     cardWidth: 260,
     groupRelatedEvents: true,
     showBackground: true,

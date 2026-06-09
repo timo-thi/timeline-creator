@@ -74,6 +74,7 @@ settings:
   lineCount: 2
   majorTickUnit: hour
   secondaryTickUnit:
+  showSecondaryTickLabels: false
   cardWidth: 260
   groupRelatedEvents: true
   showBackground: true
@@ -112,6 +113,7 @@ zoomSections:
     endDate: 2026-05-01T12:00:00Z
     timelineLength: 900
     lineCount: 1
+    showSecondaryTickLabels: false
     offsets:
       evt-1:
         x: 20

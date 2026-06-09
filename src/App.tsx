@@ -376,6 +376,7 @@ function App() {
       endDate: new Date(start + (end - start) * 0.75).toISOString(),
       timelineLength: documentState.settings.timelineLength,
       lineCount: documentState.settings.lineCount,
+      showSecondaryTickLabels: documentState.settings.showSecondaryTickLabels,
       offsets: {},
     }
     setDocumentState((current) => ({ ...current, zoomSections: [...current.zoomSections, section] }))
@@ -486,6 +487,7 @@ function createZoomDocument(
       endDate: section.endDate,
       timelineLength: section.timelineLength,
       lineCount: section.lineCount,
+      showSecondaryTickLabels: section.showSecondaryTickLabels,
     },
     events,
   }

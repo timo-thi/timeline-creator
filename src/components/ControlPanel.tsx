@@ -182,6 +182,17 @@ function ControlPanel({
               ))}
             </select>
           </label>
+          <label className="checkbox">
+            <input
+              type="checkbox"
+              checked={documentState.settings.showSecondaryTickLabels}
+              disabled={!documentState.settings.secondaryTickUnit}
+              onChange={(event) =>
+                onPatchSetting('showSecondaryTickLabels', event.target.checked)
+              }
+            />
+            <span>Secondary tick labels</span>
+          </label>
           <label>
             <span>Default card width</span>
             <input
@@ -354,6 +365,19 @@ function ControlPanel({
                       })
                     }
                   />
+                </label>
+                <label className="checkbox full-span">
+                  <input
+                    type="checkbox"
+                    checked={section.showSecondaryTickLabels}
+                    disabled={!documentState.settings.secondaryTickUnit}
+                    onChange={(event) =>
+                      onPatchZoomSection(section.id, {
+                        showSecondaryTickLabels: event.target.checked,
+                      })
+                    }
+                  />
+                  <span>Show secondary tick labels</span>
                 </label>
                 <button
                   type="button"

@@ -22,6 +22,7 @@ export interface TimelineSettings {
   lineCount: number
   majorTickUnit: TimelineTickUnit
   secondaryTickUnit?: TimelineTickUnit
+  showSecondaryTickLabels: boolean
   cardWidth: number
   groupRelatedEvents: boolean
   showBackground: boolean
@@ -61,6 +62,7 @@ export interface TimelineZoomSection {
   endDate: string
   timelineLength: number
   lineCount: number
+  showSecondaryTickLabels: boolean
   offsets: Record<string, TimelineEventOffset>
 }
 
