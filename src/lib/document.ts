@@ -9,7 +9,7 @@ export function createEvent(baseDate: string): TimelineEvent {
     id: crypto.randomUUID(),
     title: 'New event',
     date: baseDate,
-    description: 'Describe the evidence handling step here.',
+    description: '',
     causes: [],
     style: {},
     offset: { x: 0, y: 0 },
@@ -27,6 +27,11 @@ export function normalizeDocument(input: unknown): TimelineDocument {
 
   const parsed = input as Partial<TimelineDocument>
   const settings = parsed.settings ?? fallback.settings
+  const legacySettings = settings as unknown as { segmentLength?: unknown }
+  const legacySegmentLength =
+    typeof legacySettings.segmentLength === 'number' && Number.isFinite(legacySettings.segmentLength)
+      ? legacySettings.segmentLength
+      : undefined
   const events =
     Array.isArray(parsed.events) && parsed.events.length > 0 ? parsed.events : fallback.events
   const normalizedEvents = events.map((event, index) => normalizeEvent(event, index))
@@ -45,13 +50,21 @@ export function normalizeDocument(input: unknown): TimelineDocument {
         : derivedBounds.startDate,
       endDate: isValidDateString(settings.endDate) ? settings.endDate : derivedBounds.endDate,
       timelineLength:
-        typeof settings.timelineLength === 'number'
+        legacySegmentLength ??
+        (typeof settings.timelineLength === 'number'
           ? settings.timelineLength
-          : fallback.settings.timelineLength,
-      segmentLength:
-        typeof settings.segmentLength === 'number'
-          ? settings.segmentLength
-          : fallback.settings.segmentLength,
+          : fallback.settings.timelineLength),
+      lineCount:
+        typeof settings.lineCount === 'number' && Number.isFinite(settings.lineCount)
+          ? clampLineCount(settings.lineCount)
+          : legacySegmentLength
+            ? clampLineCount(
+                Math.ceil(
+                  (settings.timelineLength ?? fallback.settings.timelineLength) /
+                    legacySegmentLength,
+                ),
+              )
+            : fallback.settings.lineCount,
       majorTickUnit:
         settings.majorTickUnit === 'hour' ||
         settings.majorTickUnit === 'day' ||
@@ -155,8 +168,7 @@ function normalizeEvent(input: unknown, index: number): TimelineEvent {
       typeof parsed.date === 'string' && !Number.isNaN(new Date(parsed.date).getTime())
         ? parsed.date
         : fallback.date,
-    description:
-      typeof parsed.description === 'string' ? parsed.description : fallback.description,
+    description: typeof parsed.description === 'string' ? parsed.description : '',
     causes: Array.isArray(parsed.causes)
       ? parsed.causes.filter((cause): cause is string => typeof cause === 'string')
       : [],
@@ -192,4 +204,8 @@ function getFallbackBounds(events: TimelineEvent[], fallback: TimelineDocument) 
 
 function isValidDateString(value: unknown): value is string {
   return typeof value === 'string' && !Number.isNaN(new Date(value).getTime())
+}
+
+function clampLineCount(value: number) {
+  return Math.min(20, Math.max(1, Math.round(value)))
 }

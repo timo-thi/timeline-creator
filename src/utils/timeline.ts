@@ -12,12 +12,16 @@ import { summarizeMarkdown } from './markdown'
 
 const CARD_PADDING = 18
 const LANE_SIZE = 184
+const LANE_GAP = 24
 const AXIS_BAND = 140
 const OUTER_PADDING = 72
 const SEGMENT_GAP = 84
 const CONNECTOR_GAP = 16
 const LANE_INTERVAL_PADDING = 20
 const MIN_TIME_SPAN_MS = 60 * 60 * 1000
+const MAX_LINE_COUNT = 20
+const DEPENDENCY_CLEARANCE = 18
+const DEPENDENCY_OBSTACLE_PADDING = 8
 
 interface PendingEventLayout {
   event: TimelineEvent
@@ -30,6 +34,28 @@ interface PendingEventLayout {
   side: Exclude<EventSide, 'auto'>
 }
 
+interface LaneLayout {
+  intervals: number[][]
+  span: number
+}
+
+interface SegmentLanes {
+  before: LaneLayout[]
+  after: LaneLayout[]
+}
+
+interface Point {
+  x: number
+  y: number
+}
+
+interface Rect {
+  left: number
+  right: number
+  top: number
+  bottom: number
+}
+
 /**
  * Computes deterministic positions for the entire timeline, including wrapped segments.
  */
@@ -40,32 +66,44 @@ export function computeTimelineLayout(document: TimelineDocument): TimelineLayou
 
   const { minDate, maxDate } = getDateBounds(document, sortedEvents)
   const direction = document.settings.direction
-  const segmentLength = Math.max(240, document.settings.segmentLength)
-  const timelineLength = Math.max(segmentLength, document.settings.timelineLength)
-  const segmentCount = Math.max(1, Math.ceil(timelineLength / segmentLength))
+  const lineLength = Math.max(1, document.settings.timelineLength)
+  const segmentCount = Number.isFinite(document.settings.lineCount)
+    ? clamp(Math.round(document.settings.lineCount), 1, MAX_LINE_COUNT)
+    : 1
+  const cumulativeLength = lineLength * segmentCount
 
-  const lanesPerSegment = Array.from({ length: segmentCount }, () => ({
-    before: [] as number[][][],
-    after: [] as number[][][],
+  const lanesPerSegment: SegmentLanes[] = Array.from({ length: segmentCount }, () => ({
+    before: [],
+    after: [],
   }))
 
   const pending: PendingEventLayout[] = []
 
   for (const event of sortedEvents) {
-    const offsetAbs = getAbsoluteOffset(event.date, minDate, maxDate, timelineLength)
-    const segmentIndex = Math.min(segmentCount - 1, Math.floor(offsetAbs / segmentLength))
-    const pointOffset =
-      segmentIndex === segmentCount - 1
-        ? Math.min(offsetAbs % segmentLength, segmentLength)
-        : offsetAbs % segmentLength
+    const offsetAbs = getAbsoluteOffset(event.date, minDate, maxDate, cumulativeLength)
+    const { segmentIndex, pointOffset } = getSegmentPosition(
+      offsetAbs,
+      lineLength,
+      segmentCount,
+    )
     const cardWidth = Math.max(180, event.style.width ?? document.settings.cardWidth)
     const cardHeight = estimateCardHeight(event, cardWidth)
     const side = resolveSide(event.style.side, direction, pending.length)
     const sideKey = side === 'above' || side === 'left' ? 'before' : 'after'
-    const anchorOffset = clamp(pointOffset - cardWidth / 2, 0, segmentLength - cardWidth)
+    const cardMainSize = direction === 'horizontal' ? cardWidth : cardHeight
+    const cardCrossSize = direction === 'horizontal' ? cardHeight : cardWidth
+    const anchorOffset =
+      cardMainSize > lineLength
+        ? (lineLength - cardMainSize) / 2
+        : clamp(pointOffset - cardMainSize / 2, 0, lineLength - cardMainSize)
     const intervalStart = anchorOffset - LANE_INTERVAL_PADDING
-    const intervalEnd = anchorOffset + cardWidth + LANE_INTERVAL_PADDING
-    const lane = placeInLane(lanesPerSegment[segmentIndex][sideKey], intervalStart, intervalEnd)
+    const intervalEnd = anchorOffset + cardMainSize + LANE_INTERVAL_PADDING
+    const lane = placeInLane(
+      lanesPerSegment[segmentIndex][sideKey],
+      intervalStart,
+      intervalEnd,
+      cardCrossSize,
+    )
 
     pending.push({
       event,
@@ -79,13 +117,13 @@ export function computeTimelineLayout(document: TimelineDocument): TimelineLayou
     })
   }
 
-  const segments = buildSegments(direction, segmentLength, segmentCount, lanesPerSegment)
+  const segments = buildSegments(direction, lineLength, segmentCount, lanesPerSegment)
   const rawEvents = pending.map((item) =>
     direction === 'horizontal'
-      ? finalizeHorizontalEvent(item, segments[item.segmentIndex])
-      : finalizeVerticalEvent(item, segments[item.segmentIndex]),
+      ? finalizeHorizontalEvent(item, segments[item.segmentIndex], lanesPerSegment[item.segmentIndex])
+      : finalizeVerticalEvent(item, segments[item.segmentIndex], lanesPerSegment[item.segmentIndex]),
   )
-  const rawTicks = buildTicks(document, segments, minDate, maxDate, timelineLength, segmentLength)
+  const rawTicks = buildTicks(document, segments, minDate, maxDate, cumulativeLength, lineLength)
   const normalized = normalizeLayoutBounds(document, segments, rawEvents, rawTicks)
 
   return {
@@ -100,23 +138,166 @@ export function computeTimelineLayout(document: TimelineDocument): TimelineLayou
 }
 
 /**
- * Builds an orthogonal arrow path between a cause and its effect.
+ * Builds an orthogonal arrow that attaches to nearby card edges and avoids cards.
  */
-export function buildDependencyPath(from: EventLayout, to: EventLayout): string {
-  const startX = from.anchorX + (to.pointX >= from.pointX ? from.cardWidth : 0)
-  const startY = from.anchorY + from.cardHeight / 2
-  const endX = to.anchorX + (to.pointX >= from.pointX ? 0 : to.cardWidth)
-  const endY = to.anchorY + to.cardHeight / 2
-  const midX = (startX + endX) / 2
-  const midY = (startY + endY) / 2
+export function buildDependencyPath(
+  from: EventLayout,
+  to: EventLayout,
+  events: EventLayout[] = [from, to],
+): string {
+  const obstacles = events.map((event) => getEventRect(event, DEPENDENCY_OBSTACLE_PADDING))
+  const fromObstacleIndex = events.findIndex((event) => event.event.id === from.event.id)
+  const toObstacleIndex = events.findIndex((event) => event.event.id === to.event.id)
+  const routeCandidates = getPortPairs(from, to).flatMap(({ start, startOuter, end, endOuter }) =>
+    getOrthogonalRoutes(startOuter, endOuter, obstacles).map((middle) => [
+      start,
+      startOuter,
+      ...middle,
+      endOuter,
+      end,
+    ]),
+  )
+  const route =
+    routeCandidates
+      .filter((candidate) =>
+        routeAvoidsObstacles(candidate, obstacles, fromObstacleIndex, toObstacleIndex),
+      )
+      .sort((a, b) => getRouteLength(a) - getRouteLength(b))[0] ??
+    routeCandidates.sort((a, b) => getRouteLength(a) - getRouteLength(b))[0]
+
+  return route.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ')
+}
+
+function getPortPairs(from: EventLayout, to: EventLayout) {
+  const fromCenter = getEventCenter(from)
+  const toCenter = getEventCenter(to)
+  const fromPorts = getEventPorts(from, toCenter)
+  const toPorts = getEventPorts(to, fromCenter)
+
+  return fromPorts.flatMap((start) =>
+    toPorts.map((end) => ({
+      start: start.point,
+      startOuter: start.outer,
+      end: end.point,
+      endOuter: end.outer,
+    })),
+  )
+}
+
+function getEventCenter(event: EventLayout): Point {
+  return {
+    x: event.anchorX + event.cardWidth / 2,
+    y: event.anchorY + event.cardHeight / 2,
+  }
+}
+
+function getEventPorts(event: EventLayout, target: Point) {
+  const inset = 18
+  const horizontalY = clamp(target.y, event.anchorY + inset, event.anchorY + event.cardHeight - inset)
+  const verticalX = clamp(target.x, event.anchorX + inset, event.anchorX + event.cardWidth - inset)
 
   return [
-    `M ${startX} ${startY}`,
-    `L ${startX + CONNECTOR_GAP * Math.sign(midX - startX || 1)} ${startY}`,
-    `Q ${midX} ${startY} ${midX} ${midY}`,
-    `Q ${midX} ${endY} ${endX - CONNECTOR_GAP * Math.sign(endX - midX || 1)} ${endY}`,
-    `L ${endX} ${endY}`,
-  ].join(' ')
+    createPort(event.anchorX, horizontalY, -DEPENDENCY_CLEARANCE, 0),
+    createPort(event.anchorX + event.cardWidth, horizontalY, DEPENDENCY_CLEARANCE, 0),
+    createPort(verticalX, event.anchorY, 0, -DEPENDENCY_CLEARANCE),
+    createPort(verticalX, event.anchorY + event.cardHeight, 0, DEPENDENCY_CLEARANCE),
+  ]
+}
+
+function createPort(x: number, y: number, offsetX: number, offsetY: number) {
+  return {
+    point: { x, y },
+    outer: { x: x + offsetX, y: y + offsetY },
+  }
+}
+
+function getOrthogonalRoutes(start: Point, end: Point, obstacles: Rect[]): Point[][] {
+  const routes: Point[][] = [
+    [{ x: end.x, y: start.y }],
+    [{ x: start.x, y: end.y }],
+  ]
+  const bounds = obstacles.reduce(
+    (result, obstacle) => ({
+      left: Math.min(result.left, obstacle.left),
+      right: Math.max(result.right, obstacle.right),
+      top: Math.min(result.top, obstacle.top),
+      bottom: Math.max(result.bottom, obstacle.bottom),
+    }),
+    { left: start.x, right: start.x, top: start.y, bottom: start.y },
+  )
+  const detour = DEPENDENCY_CLEARANCE
+
+  routes.push(
+    [
+      { x: bounds.left - detour, y: start.y },
+      { x: bounds.left - detour, y: end.y },
+    ],
+    [
+      { x: bounds.right + detour, y: start.y },
+      { x: bounds.right + detour, y: end.y },
+    ],
+    [
+      { x: start.x, y: bounds.top - detour },
+      { x: end.x, y: bounds.top - detour },
+    ],
+    [
+      { x: start.x, y: bounds.bottom + detour },
+      { x: end.x, y: bounds.bottom + detour },
+    ],
+  )
+
+  return routes
+}
+
+function routeAvoidsObstacles(
+  points: Point[],
+  obstacles: Rect[],
+  fromObstacleIndex: number,
+  toObstacleIndex: number,
+) {
+  return points.slice(1).every((point, index) => {
+    const previous = points[index]
+    return obstacles.every((obstacle, obstacleIndex) => {
+      const isSourceStub = index === 0 && obstacleIndex === fromObstacleIndex
+      const isTargetStub = index === points.length - 2 && obstacleIndex === toObstacleIndex
+      return isSourceStub || isTargetStub || !segmentIntersectsRect(previous, point, obstacle)
+    })
+  })
+}
+
+function segmentIntersectsRect(start: Point, end: Point, rect: Rect) {
+  if (start.x === end.x) {
+    return (
+      start.x > rect.left &&
+      start.x < rect.right &&
+      Math.max(start.y, end.y) > rect.top &&
+      Math.min(start.y, end.y) < rect.bottom
+    )
+  }
+
+  return (
+    start.y > rect.top &&
+    start.y < rect.bottom &&
+    Math.max(start.x, end.x) > rect.left &&
+    Math.min(start.x, end.x) < rect.right
+  )
+}
+
+function getRouteLength(points: Point[]) {
+  return points.slice(1).reduce(
+    (length, point, index) =>
+      length + Math.abs(point.x - points[index].x) + Math.abs(point.y - points[index].y),
+    0,
+  )
+}
+
+function getEventRect(event: EventLayout, padding: number): Rect {
+  return {
+    left: event.anchorX - padding,
+    right: event.anchorX + event.cardWidth + padding,
+    top: event.anchorY - padding,
+    bottom: event.anchorY + event.cardHeight + padding,
+  }
 }
 
 /**
@@ -142,18 +323,16 @@ export function formatAxisDate(timestamp: number, unit: TimelineTickUnit): strin
 
 function buildSegments(
   direction: TimelineDocument['settings']['direction'],
-  segmentLength: number,
+  lineLength: number,
   segmentCount: number,
-  lanesPerSegment: Array<{ before: number[][][]; after: number[][][] }>,
+  lanesPerSegment: SegmentLanes[],
 ): SegmentLayout[] {
   const segments: SegmentLayout[] = []
   let runningCross = OUTER_PADDING
 
   for (let index = 0; index < segmentCount; index += 1) {
-    const beforeCount = lanesPerSegment[index].before.length
-    const afterCount = lanesPerSegment[index].after.length
-    const beforeSpan = Math.max(1, beforeCount) * LANE_SIZE
-    const afterSpan = Math.max(1, afterCount) * LANE_SIZE
+    const beforeSpan = getLanesSpan(lanesPerSegment[index].before)
+    const afterSpan = getLanesSpan(lanesPerSegment[index].after)
 
     if (direction === 'horizontal') {
       const axisY = runningCross + beforeSpan + AXIS_BAND / 2
@@ -161,10 +340,10 @@ function buildSegments(
         index,
         axisStartX: OUTER_PADDING,
         axisStartY: axisY,
-        axisEndX: OUTER_PADDING + segmentLength,
+        axisEndX: OUTER_PADDING + lineLength,
         axisEndY: axisY,
         mainStart: OUTER_PADDING,
-        mainEnd: OUTER_PADDING + segmentLength,
+        mainEnd: OUTER_PADDING + lineLength,
       })
       runningCross += beforeSpan + AXIS_BAND + afterSpan + SEGMENT_GAP
       continue
@@ -176,9 +355,9 @@ function buildSegments(
       axisStartX: axisX,
       axisStartY: OUTER_PADDING,
       axisEndX: axisX,
-      axisEndY: OUTER_PADDING + segmentLength,
+      axisEndY: OUTER_PADDING + lineLength,
       mainStart: OUTER_PADDING,
-      mainEnd: OUTER_PADDING + segmentLength,
+      mainEnd: OUTER_PADDING + lineLength,
     })
     runningCross += beforeSpan + AXIS_BAND + afterSpan + SEGMENT_GAP
   }
@@ -191,8 +370,8 @@ function buildTicks(
   segments: SegmentLayout[],
   minDate: number,
   maxDate: number,
-  timelineLength: number,
-  segmentLength: number,
+  cumulativeLength: number,
+  lineLength: number,
 ): TickLayout[] {
   const timestamps = getMajorTickTimestamps(minDate, maxDate, document.settings.majorTickUnit)
   const edgeTicks = [minDate, ...timestamps, maxDate]
@@ -208,12 +387,17 @@ function buildTicks(
       return true
     })
     .map((timestamp) => {
-      const offsetAbs = getAbsoluteOffset(new Date(timestamp).toISOString(), minDate, maxDate, timelineLength)
-      const segmentIndex = Math.min(segments.length - 1, Math.floor(offsetAbs / segmentLength))
-      const pointOffset =
-        segmentIndex === segments.length - 1
-          ? Math.min(offsetAbs % segmentLength, segmentLength)
-          : offsetAbs % segmentLength
+      const offsetAbs = getAbsoluteOffset(
+        new Date(timestamp).toISOString(),
+        minDate,
+        maxDate,
+        cumulativeLength,
+      )
+      const { segmentIndex, pointOffset } = getSegmentPosition(
+        offsetAbs,
+        lineLength,
+        segments.length,
+      )
       const segment = segments[segmentIndex]
       const x =
         document.settings.direction === 'horizontal'
@@ -235,14 +419,19 @@ function buildTicks(
     })
 }
 
-function finalizeHorizontalEvent(item: PendingEventLayout, segment: SegmentLayout): EventLayout {
+function finalizeHorizontalEvent(
+  item: PendingEventLayout,
+  segment: SegmentLayout,
+  lanes: SegmentLanes,
+): EventLayout {
   const pointX = segment.axisStartX + item.pointOffset
   const pointY = segment.axisStartY
   const x = segment.axisStartX + item.anchorOffset + item.event.offset.x
+  const laneOffset = getLaneOffset(getLanesForSide(lanes, item.side), item.lane)
   const laneBase =
     item.side === 'above'
-      ? segment.axisStartY - CONNECTOR_GAP - item.cardHeight - item.lane * LANE_SIZE
-      : segment.axisStartY + CONNECTOR_GAP + item.lane * LANE_SIZE
+      ? segment.axisStartY - CONNECTOR_GAP - item.cardHeight - laneOffset
+      : segment.axisStartY + CONNECTOR_GAP + laneOffset
   const y = laneBase + item.event.offset.y
 
   return {
@@ -260,14 +449,19 @@ function finalizeHorizontalEvent(item: PendingEventLayout, segment: SegmentLayou
   }
 }
 
-function finalizeVerticalEvent(item: PendingEventLayout, segment: SegmentLayout): EventLayout {
+function finalizeVerticalEvent(
+  item: PendingEventLayout,
+  segment: SegmentLayout,
+  lanes: SegmentLanes,
+): EventLayout {
   const pointX = segment.axisStartX
   const pointY = segment.axisStartY + item.pointOffset
   const y = segment.axisStartY + item.anchorOffset + item.event.offset.y
+  const laneOffset = getLaneOffset(getLanesForSide(lanes, item.side), item.lane)
   const laneBase =
     item.side === 'left'
-      ? segment.axisStartX - CONNECTOR_GAP - item.cardWidth - item.lane * LANE_SIZE
-      : segment.axisStartX + CONNECTOR_GAP + item.lane * LANE_SIZE
+      ? segment.axisStartX - CONNECTOR_GAP - item.cardWidth - laneOffset
+      : segment.axisStartX + CONNECTOR_GAP + laneOffset
   const x = laneBase + item.event.offset.x
 
   return {
@@ -320,6 +514,21 @@ function getAbsoluteOffset(date: string, minDate: number, maxDate: number, timel
   const timestamp = new Date(date).getTime()
   const ratio = clamp((timestamp - minDate) / Math.max(1, maxDate - minDate), 0, 1)
   return ratio * timelineLength
+}
+
+function getSegmentPosition(offset: number, lineLength: number, segmentCount: number) {
+  if (offset >= lineLength * segmentCount) {
+    return {
+      segmentIndex: segmentCount - 1,
+      pointOffset: lineLength,
+    }
+  }
+
+  const segmentIndex = Math.floor(offset / lineLength)
+  return {
+    segmentIndex,
+    pointOffset: offset - segmentIndex * lineLength,
+  }
 }
 
 function getMajorTickTimestamps(start: number, end: number, unit: TimelineTickUnit) {
@@ -400,29 +609,67 @@ function resolveSide(
   return index % 2 === 0 ? 'left' : 'right'
 }
 
-function placeInLane(lanes: number[][][], start: number, end: number) {
+function placeInLane(lanes: LaneLayout[], start: number, end: number, cardCrossSize: number) {
   for (let laneIndex = 0; laneIndex < lanes.length; laneIndex += 1) {
     const lane = lanes[laneIndex]
-    const overlaps = lane.some(([laneStart, laneEnd]) => start < laneEnd && end > laneStart)
+    const overlaps = lane.intervals.some(
+      ([laneStart, laneEnd]) => start < laneEnd && end > laneStart,
+    )
 
     if (!overlaps) {
-      lane.push([start, end])
+      lane.intervals.push([start, end])
+      lane.span = Math.max(lane.span, cardCrossSize + LANE_GAP)
       return laneIndex
     }
   }
 
-  lanes.push([[start, end]])
+  lanes.push({
+    intervals: [[start, end]],
+    span: cardCrossSize + LANE_GAP,
+  })
   return lanes.length - 1
 }
 
 function estimateCardHeight(event: TimelineEvent, cardWidth: number) {
-  const titleLines = Math.max(1, Math.ceil(event.title.length / 26))
-  const summary = summarizeMarkdown(event.description)
-  const summaryLines = Math.min(
-    6,
-    Math.max(2, Math.ceil(summary.length / Math.max(20, cardWidth / 8))),
+  const contentWidth = cardWidth - 28
+  const titleLines = estimateTextLines(event.title || 'Untitled event', contentWidth, 8)
+  const descriptionHeight = estimateMarkdownHeight(event.description, contentWidth)
+
+  return Math.ceil(CARD_PADDING * 2 + 24 + titleLines * 21 + descriptionHeight)
+}
+
+function estimateMarkdownHeight(markdown: string, contentWidth: number) {
+  if (!markdown.trim()) {
+    return 0
+  }
+
+  const nonEmptyLines = markdown
+    .split('\n')
+    .filter((line) => line.trim().length > 0)
+  const renderedLines = nonEmptyLines.reduce(
+    (total, line) => total + estimateTextLines(summarizeMarkdown(line), contentWidth, 7),
+    0,
   )
-  return CARD_PADDING * 2 + titleLines * 18 + summaryLines * 16 + 60
+  const blockCount = markdown.trim().split(/\n\s*\n/).length
+
+  return renderedLines * 18 + blockCount * 8
+}
+
+function estimateTextLines(text: string, contentWidth: number, characterWidth: number) {
+  const charactersPerLine = Math.max(1, Math.floor(contentWidth / characterWidth))
+  return Math.max(1, Math.ceil(text.length / charactersPerLine))
+}
+
+function getLanesSpan(lanes: LaneLayout[]) {
+  return lanes.length > 0 ? lanes.reduce((total, lane) => total + lane.span, 0) : LANE_SIZE
+}
+
+function getLaneOffset(lanes: LaneLayout[], laneIndex: number) {
+  return lanes.slice(0, laneIndex).reduce((total, lane) => total + lane.span, 0)
+}
+
+function getLanesForSide(lanes: SegmentLanes, side: Exclude<EventSide, 'auto'>) {
+  return side === 'above' || side === 'left' ? lanes.before : lanes.after
 }
 
 function clamp(value: number, min: number, max: number) {

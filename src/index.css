@@ -341,7 +341,6 @@ h2 {
   font-size: 12.5px;
   line-height: 1.4;
   height: 100%;
-  overflow: hidden;
 }
 
 .card-date {
@@ -358,10 +357,12 @@ h2 {
   margin-bottom: 0.55rem;
 }
 
+.card-title.last {
+  margin-bottom: 0;
+}
+
 .card-markdown {
   color: var(--muted);
-  max-height: calc(100% - 40px);
-  overflow: hidden;
 }
 
 .card-markdown p,

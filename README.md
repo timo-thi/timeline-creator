@@ -68,8 +68,8 @@ settings:
   direction: horizontal
   startDate: 2026-05-01T08:00:00Z
   endDate: 2026-05-02T12:00:00Z
-  timelineLength: 1800
-  segmentLength: 900
+  timelineLength: 900
+  lineCount: 2
   majorTickUnit: hour
   cardWidth: 260
   showBackground: true
@@ -106,8 +106,8 @@ events:
 
 - `direction`: `horizontal` or `vertical`
 - `startDate` / `endDate`: explicit visible range of the timeline, including time
-- `timelineLength`: total virtual axis length in pixels before wrapping
-- `segmentLength`: maximum axis length per wrapped segment
+- `timelineLength`: rendered length in pixels of each line
+- `lineCount`: number of equal-length rows or columns used by the timeline
 - `majorTickUnit`: `hour`, `day`, `week`, or `month`
 - `causes`: list of earlier event IDs that explain this event
 - `offset`: manual drag adjustment applied on top of automatic placement
@@ -130,8 +130,8 @@ events:
 ## Layout behavior
 
 - Events are sorted by date and placed against the explicit timeline bounds.
-- Each event is mapped onto a virtual axis (`timelineLength`).
-- If the axis exceeds `segmentLength`, the timeline wraps into multiple rows or columns.
+- Each line is rendered at `timelineLength` pixels.
+- Events are mapped onto a cumulative axis with a length of `timelineLength * lineCount`.
 - Major tick marks and labels are generated from the configured tick unit.
 - Cards are assigned to non-overlapping lanes on either side of the axis.
 - Thin connector lines point from each card to the exact event timestamp on the axis.
@@ -140,5 +140,5 @@ events:
 ## Limitations
 
 - Raster export depends on the browser being able to re-load the generated SVG into an image element.
-- Markdown inside cards is clipped to keep cards compact in exported visuals.
+- Card height is estimated from the title and optional markdown description.
 - Import validation is intentionally lightweight and normalizes missing fields instead of rejecting most partial files.

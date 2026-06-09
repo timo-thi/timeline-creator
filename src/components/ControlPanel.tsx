@@ -158,20 +158,21 @@ function ControlPanel({
             <span>Timeline length</span>
             <input
               type="number"
-              min="600"
+              min="1"
               step="100"
               value={documentState.settings.timelineLength}
               onChange={(event) => onPatchSetting('timelineLength', Number(event.target.value))}
             />
           </label>
           <label>
-            <span>Wrap segment length</span>
+            <span>Number of lines</span>
             <input
               type="number"
-              min="240"
-              step="50"
-              value={documentState.settings.segmentLength}
-              onChange={(event) => onPatchSetting('segmentLength', Number(event.target.value))}
+              min="1"
+              max="20"
+              step="1"
+              value={documentState.settings.lineCount}
+              onChange={(event) => onPatchSetting('lineCount', Number(event.target.value))}
             />
           </label>
         </div>

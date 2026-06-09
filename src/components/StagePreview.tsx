@@ -172,41 +172,9 @@ function StagePreview({
             </g>
           ))}
 
-          {layout.events.flatMap((eventLayout) =>
-            eventLayout.event.causes
-              .map((causeId) => {
-                const cause = eventLookup.get(causeId)
-                if (!cause) {
-                  return null
-                }
-
-                return (
-                  <path
-                    key={`${causeId}-${eventLayout.event.id}`}
-                    d={buildDependencyPath(cause, eventLayout)}
-                    fill="none"
-                    stroke={documentState.settings.theme.accent}
-                    strokeWidth="2"
-                    strokeDasharray="8 6"
-                    markerEnd="url(#arrowhead)"
-                    opacity="0.9"
-                  />
-                )
-              })
-              .filter(Boolean),
-          )}
-
           {layout.events.map((eventLayout) => {
-            const cardTheme = {
-              accent: eventLayout.event.style.accentColor ?? documentState.settings.theme.accent,
-              surface: eventLayout.event.style.surfaceColor ?? documentState.settings.theme.surface,
-              strip:
-                eventLayout.event.style.surfaceColor ?? documentState.settings.theme.surfaceMuted,
-              text: eventLayout.event.style.textColor ?? documentState.settings.theme.ink,
-              muted: documentState.settings.theme.inkMuted,
-              border:
-                eventLayout.event.style.borderColor ?? documentState.settings.theme.surfaceMuted,
-            }
+            const accent =
+              eventLayout.event.style.accentColor ?? documentState.settings.theme.accent
             const connectorStartX =
               documentState.settings.direction === 'horizontal'
                 ? eventLayout.pointX
@@ -221,6 +189,59 @@ function StagePreview({
                 : eventLayout.pointY
 
             return (
+              <g key={`connector-${eventLayout.event.id}`}>
+                <line
+                  x1={connectorStartX}
+                  y1={connectorStartY}
+                  x2={eventLayout.pointX}
+                  y2={eventLayout.pointY}
+                  stroke={accent}
+                  strokeWidth="1.5"
+                />
+                <circle cx={eventLayout.pointX} cy={eventLayout.pointY} r="4.5" fill={accent} />
+              </g>
+            )
+          })}
+
+          {layout.events.flatMap((eventLayout) =>
+            eventLayout.event.causes
+              .map((causeId) => {
+                const cause = eventLookup.get(causeId)
+                if (!cause) {
+                  return null
+                }
+
+                return (
+                  <path
+                    key={`${causeId}-${eventLayout.event.id}`}
+                    d={buildDependencyPath(cause, eventLayout, layout.events)}
+                    fill="none"
+                    stroke={documentState.settings.theme.accent}
+                    strokeWidth="2"
+                    strokeDasharray="8 6"
+                    strokeLinejoin="round"
+                    markerEnd="url(#arrowhead)"
+                    opacity="0.9"
+                  />
+                )
+              })
+              .filter(Boolean),
+          )}
+
+          {layout.events.map((eventLayout) => {
+            const hasDescription = eventLayout.event.description.trim().length > 0
+            const cardTheme = {
+              accent: eventLayout.event.style.accentColor ?? documentState.settings.theme.accent,
+              surface: eventLayout.event.style.surfaceColor ?? documentState.settings.theme.surface,
+              strip:
+                eventLayout.event.style.surfaceColor ?? documentState.settings.theme.surfaceMuted,
+              text: eventLayout.event.style.textColor ?? documentState.settings.theme.ink,
+              muted: documentState.settings.theme.inkMuted,
+              border:
+                eventLayout.event.style.borderColor ?? documentState.settings.theme.surfaceMuted,
+            }
+
+            return (
               <g
                 key={eventLayout.event.id}
                 className={
@@ -229,15 +250,6 @@ function StagePreview({
                 onPointerDown={(event) => onPointerDown(eventLayout, event)}
                 onDoubleClick={() => onOpenDrawerFor(eventLayout.event.id)}
               >
-                <line
-                  x1={connectorStartX}
-                  y1={connectorStartY}
-                  x2={eventLayout.pointX}
-                  y2={eventLayout.pointY}
-                  stroke={cardTheme.accent}
-                  strokeWidth="1.5"
-                />
-                <circle cx={eventLayout.pointX} cy={eventLayout.pointY} r="4.5" fill={cardTheme.accent} />
                 <rect
                   x={eventLayout.anchorX}
                   y={eventLayout.anchorY}
@@ -275,13 +287,17 @@ function StagePreview({
                     }
                   >
                     <div className="card-date">{formatEventDate(eventLayout.event.date)}</div>
-                    <div className="card-title">{eventLayout.event.title || 'Untitled event'}</div>
-                    <div
-                      className="card-markdown"
-                      dangerouslySetInnerHTML={{
-                        __html: renderMarkdown(eventLayout.event.description),
-                      }}
-                    />
+                    <div className={hasDescription ? 'card-title' : 'card-title last'}>
+                      {eventLayout.event.title || 'Untitled event'}
+                    </div>
+                    {hasDescription ? (
+                      <div
+                        className="card-markdown"
+                        dangerouslySetInnerHTML={{
+                          __html: renderMarkdown(eventLayout.event.description),
+                        }}
+                      />
+                    ) : null}
                   </div>
                 </foreignObject>
               </g>

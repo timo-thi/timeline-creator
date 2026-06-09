@@ -19,7 +19,7 @@ export interface TimelineSettings {
   startDate: string
   endDate: string
   timelineLength: number
-  segmentLength: number
+  lineCount: number
   majorTickUnit: TimelineTickUnit
   cardWidth: number
   showBackground: boolean
