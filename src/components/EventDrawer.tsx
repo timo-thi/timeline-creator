@@ -1,5 +1,6 @@
 import { type TimelineDocument, type TimelineEvent } from '../types'
 import { renderMarkdown } from '../utils/markdown'
+import ColorField from './ColorField'
 
 interface EventDrawerProps {
   documentState: TimelineDocument
@@ -126,62 +127,34 @@ function EventDrawer({
                 }
               />
             </label>
-            <label>
-              <span>Accent</span>
-              <input
-                type="color"
-                value={selectedEvent.style.accentColor ?? documentState.settings.theme.accent}
-                onChange={(event) =>
-                  onPatchSelectedEvent({
-                    style: {
-                      accentColor: event.target.value,
-                    },
-                  })
-                }
-              />
-            </label>
-            <label>
-              <span>Surface</span>
-              <input
-                type="color"
-                value={selectedEvent.style.surfaceColor ?? documentState.settings.theme.surface}
-                onChange={(event) =>
-                  onPatchSelectedEvent({
-                    style: {
-                      surfaceColor: event.target.value,
-                    },
-                  })
-                }
-              />
-            </label>
-            <label>
-              <span>Border</span>
-              <input
-                type="color"
-                value={selectedEvent.style.borderColor ?? '#d2b38a'}
-                onChange={(event) =>
-                  onPatchSelectedEvent({
-                    style: {
-                      borderColor: event.target.value,
-                    },
-                  })
-                }
-              />
-            </label>
-            <label>
-              <span>Text</span>
-              <input
-                type="color"
-                value={selectedEvent.style.textColor ?? documentState.settings.theme.ink}
-                onChange={(event) =>
-                  onPatchSelectedEvent({
-                    style: {
-                      textColor: event.target.value,
-                    },
-                  })
-                }
-              />
-            </label>
+            <ColorField
+              label="Accent"
+              value={selectedEvent.style.accentColor ?? documentState.settings.theme.accent}
+              onChange={(value) =>
+                onPatchSelectedEvent({ style: { accentColor: value } })
+              }
+            />
+            <ColorField
+              label="Surface"
+              value={selectedEvent.style.surfaceColor ?? documentState.settings.theme.surface}
+              onChange={(value) =>
+                onPatchSelectedEvent({ style: { surfaceColor: value } })
+              }
+            />
+            <ColorField
+              label="Border"
+              value={selectedEvent.style.borderColor ?? '#d2b38a'}
+              onChange={(value) =>
+                onPatchSelectedEvent({ style: { borderColor: value } })
+              }
+            />
+            <ColorField
+              label="Text"
+              value={selectedEvent.style.textColor ?? documentState.settings.theme.ink}
+              onChange={(value) =>
+                onPatchSelectedEvent({ style: { textColor: value } })
+              }
+            />
           </div>
 
           <div className="dependency-picker">

@@ -77,6 +77,25 @@ input[type='color'] {
   padding: 0.24rem;
 }
 
+.color-field-controls {
+  display: grid;
+  grid-template-columns: minmax(6.8rem, 1fr) 2.8rem;
+  gap: 0.4rem;
+}
+
+.color-field-controls input[type='text'] {
+  min-width: 0;
+  padding-inline: 0.65rem;
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', monospace;
+  text-transform: lowercase;
+}
+
+.color-field-controls input[type='color'] {
+  width: 2.8rem;
+  min-height: 2.8rem;
+  padding: 0.2rem;
+}
+
 textarea {
   resize: vertical;
 }
@@ -246,7 +265,7 @@ h2 {
 
 .color-row {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.7rem;
 }
 

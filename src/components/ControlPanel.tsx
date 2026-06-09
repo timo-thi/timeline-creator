@@ -6,6 +6,7 @@ import type {
   TimelineTickUnit,
 } from '../types'
 import { formatEventDateRange } from '../utils/timeline'
+import ColorField from './ColorField'
 
 type ThemeKey = keyof TimelineDocument['settings']['theme']
 const TICK_UNITS: TimelineTickUnit[] = ['hour', 'day', 'week', 'month']
@@ -242,14 +243,12 @@ function ControlPanel({
               ['accent', 'Accent'],
             ] as const
           ).map(([key, label]) => (
-            <label key={key}>
-              <span>{label}</span>
-              <input
-                type="color"
-                value={documentState.settings.theme[key]}
-                onChange={(event) => onPatchTheme(key, event.target.value)}
-              />
-            </label>
+            <ColorField
+              key={key}
+              label={label}
+              value={documentState.settings.theme[key]}
+              onChange={(value) => onPatchTheme(key, value)}
+            />
           ))}
         </div>
       </div>
