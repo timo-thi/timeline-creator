@@ -86,6 +86,17 @@ function StagePreview({
             >
               <path d="M 0 0 L 10 5 L 0 10 z" fill={documentState.settings.theme.accent} />
             </marker>
+            <marker
+              id="timeline-arrowhead"
+              viewBox="0 0 10 10"
+              refX="8.5"
+              refY="5"
+              markerWidth="7"
+              markerHeight="7"
+              orient="auto"
+            >
+              <path d="M 0 0 L 10 5 L 0 10 z" fill={documentState.settings.theme.axis} />
+            </marker>
           </defs>
 
           {documentState.settings.showBackground ? (
@@ -159,6 +170,7 @@ function StagePreview({
                 stroke={documentState.settings.theme.axis}
                 strokeWidth="3"
                 strokeLinecap="round"
+                markerEnd="url(#timeline-arrowhead)"
               />
               <circle
                 cx={segment.axisStartX}
