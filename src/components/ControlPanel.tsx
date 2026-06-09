@@ -8,6 +8,7 @@ import type {
 import { formatEventDateRange } from '../utils/timeline'
 
 type ThemeKey = keyof TimelineDocument['settings']['theme']
+const TICK_UNITS: TimelineTickUnit[] = ['hour', 'day', 'week', 'month']
 
 interface ControlPanelProps {
   documentState: TimelineDocument
@@ -134,14 +135,44 @@ function ControlPanel({
             <span>Main tick unit</span>
             <select
               value={documentState.settings.majorTickUnit}
-              onChange={(event) =>
-                onPatchSetting('majorTickUnit', event.target.value as TimelineTickUnit)
-              }
+              onChange={(event) => {
+                const majorTickUnit = event.target.value as TimelineTickUnit
+                onPatchSetting('majorTickUnit', majorTickUnit)
+                if (
+                  documentState.settings.secondaryTickUnit &&
+                  TICK_UNITS.indexOf(documentState.settings.secondaryTickUnit) >=
+                    TICK_UNITS.indexOf(majorTickUnit)
+                ) {
+                  onPatchSetting('secondaryTickUnit', undefined)
+                }
+              }}
             >
               <option value="hour">Hour</option>
               <option value="day">Day</option>
               <option value="week">Week</option>
               <option value="month">Month</option>
+            </select>
+          </label>
+          <label>
+            <span>Secondary tick unit</span>
+            <select
+              value={documentState.settings.secondaryTickUnit ?? ''}
+              onChange={(event) =>
+                onPatchSetting(
+                  'secondaryTickUnit',
+                  (event.target.value || undefined) as TimelineTickUnit | undefined,
+                )
+              }
+            >
+              <option value="">None</option>
+              {TICK_UNITS.filter(
+                (unit) =>
+                  TICK_UNITS.indexOf(unit) < TICK_UNITS.indexOf(documentState.settings.majorTickUnit),
+              ).map((unit) => (
+                <option key={unit} value={unit}>
+                  {unit[0].toUpperCase() + unit.slice(1)}
+                </option>
+              ))}
             </select>
           </label>
           <label>

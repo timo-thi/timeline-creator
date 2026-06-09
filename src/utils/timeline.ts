@@ -145,7 +145,22 @@ export function computeTimelineLayout(document: TimelineDocument): TimelineLayou
       : finalizeVerticalEvent(item, segments[item.segmentIndex], lanesPerSegment[item.segmentIndex]),
   )
   const rawTicks = buildTicks(document, segments, minDate, maxDate, cumulativeLength, lineLength)
-  const normalized = normalizeLayoutBounds(document, segments, rawEvents, rawTicks, rawRanges)
+  const rawSecondaryTicks = buildSecondaryTicks(
+    document,
+    segments,
+    minDate,
+    maxDate,
+    cumulativeLength,
+    lineLength,
+  )
+  const normalized = normalizeLayoutBounds(
+    document,
+    segments,
+    rawEvents,
+    rawTicks,
+    rawSecondaryTicks,
+    rawRanges,
+  )
 
   return {
     width: normalized.width,
@@ -154,6 +169,7 @@ export function computeTimelineLayout(document: TimelineDocument): TimelineLayou
     maxDate,
     segments: normalized.segments,
     ticks: normalized.ticks,
+    secondaryTicks: normalized.secondaryTicks,
     ranges: normalized.ranges,
     events: normalized.events,
   }
@@ -456,6 +472,58 @@ function buildTicks(
     })
 }
 
+function buildSecondaryTicks(
+  document: TimelineDocument,
+  segments: SegmentLayout[],
+  minDate: number,
+  maxDate: number,
+  cumulativeLength: number,
+  lineLength: number,
+): TickLayout[] {
+  const unit = document.settings.secondaryTickUnit
+  if (!unit || !isFinerTickUnit(unit, document.settings.majorTickUnit)) {
+    return []
+  }
+
+  const majorTimestamps = new Set([
+    minDate,
+    ...getMajorTickTimestamps(minDate, maxDate, document.settings.majorTickUnit),
+    maxDate,
+  ].map(Math.round))
+
+  return getMajorTickTimestamps(minDate, maxDate, unit)
+    .filter((timestamp) => !majorTimestamps.has(Math.round(timestamp)))
+    .map((timestamp) => {
+      const offsetAbs = getAbsoluteOffset(
+        new Date(timestamp).toISOString(),
+        minDate,
+        maxDate,
+        cumulativeLength,
+      )
+      const { segmentIndex, pointOffset } = getSegmentPosition(
+        offsetAbs,
+        lineLength,
+        segments.length,
+      )
+      const segment = segments[segmentIndex]
+
+      return {
+        id: `secondary-${segmentIndex}-${timestamp}`,
+        segmentIndex,
+        timestamp,
+        x:
+          document.settings.direction === 'horizontal'
+            ? segment.axisStartX + pointOffset
+            : segment.axisStartX,
+        y:
+          document.settings.direction === 'horizontal'
+            ? segment.axisStartY
+            : segment.axisStartY + pointOffset,
+        label: '',
+      }
+    })
+}
+
 function finalizeHorizontalEvent(
   item: PendingEventLayout,
   segment: SegmentLayout,
@@ -626,6 +694,11 @@ function getMajorTickTimestamps(start: number, end: number, unit: TimelineTickUn
   }
 
   return ticks
+}
+
+function isFinerTickUnit(secondary: TimelineTickUnit, major: TimelineTickUnit) {
+  const order: TimelineTickUnit[] = ['hour', 'day', 'week', 'month']
+  return order.indexOf(secondary) < order.indexOf(major)
 }
 
 function alignTimestamp(timestamp: number, unit: TimelineTickUnit) {
@@ -818,6 +891,7 @@ function normalizeLayoutBounds(
   segments: SegmentLayout[],
   events: EventLayout[],
   ticks: TickLayout[],
+  secondaryTicks: TickLayout[],
   ranges: EventRangeLayout[],
 ) {
   let minX = Number.POSITIVE_INFINITY
@@ -884,6 +958,11 @@ function normalizeLayoutBounds(
       pointY: event.pointY + offsetY,
     })),
     ticks: ticks.map((tick) => ({
+      ...tick,
+      x: tick.x + offsetX,
+      y: tick.y + offsetY,
+    })),
+    secondaryTicks: secondaryTicks.map((tick) => ({
       ...tick,
       x: tick.x + offsetX,
       y: tick.y + offsetY,

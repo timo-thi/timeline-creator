@@ -113,6 +113,34 @@ function StagePreview({
           ) : null}
 
           {documentState.settings.showGrid
+            ? layout.secondaryTicks.map((tick) =>
+                documentState.settings.direction === 'horizontal' ? (
+                  <line
+                    key={tick.id}
+                    x1={tick.x}
+                    y1={tick.y - 6}
+                    x2={tick.x}
+                    y2={tick.y + 6}
+                    stroke={documentState.settings.theme.grid}
+                    strokeWidth="1"
+                    opacity="0.75"
+                  />
+                ) : (
+                  <line
+                    key={tick.id}
+                    x1={tick.x - 6}
+                    y1={tick.y}
+                    x2={tick.x + 6}
+                    y2={tick.y}
+                    stroke={documentState.settings.theme.grid}
+                    strokeWidth="1"
+                    opacity="0.75"
+                  />
+                ),
+              )
+            : null}
+
+          {documentState.settings.showGrid
             ? layout.ticks.map((tick) => (
                 <g key={tick.id}>
                   {documentState.settings.direction === 'horizontal' ? (

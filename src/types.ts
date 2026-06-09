@@ -21,6 +21,7 @@ export interface TimelineSettings {
   timelineLength: number
   lineCount: number
   majorTickUnit: TimelineTickUnit
+  secondaryTickUnit?: TimelineTickUnit
   cardWidth: number
   groupRelatedEvents: boolean
   showBackground: boolean
@@ -109,6 +110,7 @@ export interface TimelineLayout {
   maxDate: number
   segments: SegmentLayout[]
   ticks: TickLayout[]
+  secondaryTicks: TickLayout[]
   ranges: EventRangeLayout[]
   events: EventLayout[]
 }

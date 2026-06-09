@@ -71,6 +71,7 @@ settings:
   timelineLength: 900
   lineCount: 2
   majorTickUnit: hour
+  secondaryTickUnit:
   cardWidth: 260
   groupRelatedEvents: true
   showBackground: true
@@ -111,6 +112,7 @@ events:
 - `timelineLength`: rendered length in pixels of each line
 - `lineCount`: number of equal-length rows or columns used by the timeline
 - `majorTickUnit`: `hour`, `day`, `week`, or `month`
+- `secondaryTickUnit`: optional unlabeled tick unit; must be finer than `majorTickUnit`
 - `causes`: list of earlier event IDs that explain this event
 - `groupRelatedEvents`: keeps causally connected events on the same side during automatic placement
 - `endDate`: optional end timestamp; when present, the event is rendered as a range

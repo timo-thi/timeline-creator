@@ -72,6 +72,9 @@ export function normalizeDocument(input: unknown): TimelineDocument {
         settings.majorTickUnit === 'month'
           ? settings.majorTickUnit
           : fallback.settings.majorTickUnit,
+      secondaryTickUnit: isFinerTickUnit(settings.secondaryTickUnit, settings.majorTickUnit)
+        ? settings.secondaryTickUnit
+        : undefined,
       cardWidth:
         typeof settings.cardWidth === 'number'
           ? settings.cardWidth
@@ -214,4 +217,12 @@ function isValidDateString(value: unknown): value is string {
 
 function clampLineCount(value: number) {
   return Math.min(20, Math.max(1, Math.round(value)))
+}
+
+function isFinerTickUnit(
+  secondary: TimelineDocument['settings']['secondaryTickUnit'],
+  major: TimelineDocument['settings']['majorTickUnit'],
+) {
+  const order = ['hour', 'day', 'week', 'month']
+  return secondary !== undefined && order.indexOf(secondary) < order.indexOf(major)
 }
