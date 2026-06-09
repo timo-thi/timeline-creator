@@ -26,6 +26,7 @@ export const defaultTimeline: TimelineDocument = {
       accent: '#aa5a2b',
     },
   },
+  zoomSections: [],
   events: [
     {
       id: crypto.randomUUID(),

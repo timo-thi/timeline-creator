@@ -4,6 +4,7 @@ import type {
   TimelineDocument,
   TimelineEvent,
   TimelineTickUnit,
+  TimelineZoomSection,
 } from '../types'
 import { formatEventDateRange } from '../utils/timeline'
 import ColorField from './ColorField'
@@ -28,8 +29,10 @@ interface ControlPanelProps {
     value: TimelineDocument['settings']['theme'][K],
   ) => void
   onOpenDrawerFor: (eventId: string) => void
-  onExportDocument: (format: 'yaml' | 'json') => void
-  onExportImage: (format: 'png' | 'jpg' | 'svg', includeBackground: boolean) => void
+  onExportDocument: (format: 'yaml' | 'json' | 'xml') => void
+  onAddZoomSection: () => void
+  onPatchZoomSection: (sectionId: string, patch: Partial<TimelineZoomSection>) => void
+  onDeleteZoomSection: (sectionId: string) => void
   onResetAllOffsets: () => void
   onRestoreSample: () => void
   onImportClick: () => void
@@ -49,7 +52,9 @@ function ControlPanel({
   onPatchTheme,
   onOpenDrawerFor,
   onExportDocument,
-  onExportImage,
+  onAddZoomSection,
+  onPatchZoomSection,
+  onDeleteZoomSection,
   onResetAllOffsets,
   onRestoreSample,
   onImportClick,
@@ -277,6 +282,94 @@ function ControlPanel({
       </div>
 
       <div className="panel-section">
+        <div className="split-header">
+          <h2>Zoom sections</h2>
+          <button type="button" className="ghost" onClick={onAddZoomSection}>
+            Add zoom
+          </button>
+        </div>
+        {documentState.zoomSections.length === 0 ? (
+          <p className="panel-copy">No zoom sections.</p>
+        ) : (
+          <div className="zoom-section-list">
+            {documentState.zoomSections.map((section) => (
+              <div key={section.id} className="zoom-section-editor">
+                <label className="full-span">
+                  <span>Title</span>
+                  <input
+                    value={section.title}
+                    onChange={(event) =>
+                      onPatchZoomSection(section.id, { title: event.target.value })
+                    }
+                  />
+                </label>
+                <label className="full-span">
+                  <span>Start</span>
+                  <input
+                    type="datetime-local"
+                    value={toDateTimeLocalValue(section.startDate)}
+                    onChange={(event) =>
+                      onPatchZoomSection(section.id, {
+                        startDate: new Date(event.target.value).toISOString(),
+                      })
+                    }
+                  />
+                </label>
+                <label className="full-span">
+                  <span>End</span>
+                  <input
+                    type="datetime-local"
+                    value={toDateTimeLocalValue(section.endDate)}
+                    onChange={(event) =>
+                      onPatchZoomSection(section.id, {
+                        endDate: new Date(event.target.value).toISOString(),
+                      })
+                    }
+                  />
+                </label>
+                <label>
+                  <span>Timeline length</span>
+                  <input
+                    type="number"
+                    min="1"
+                    step="100"
+                    value={section.timelineLength}
+                    onChange={(event) =>
+                      onPatchZoomSection(section.id, {
+                        timelineLength: Number(event.target.value),
+                      })
+                    }
+                  />
+                </label>
+                <label>
+                  <span>Number of lines</span>
+                  <input
+                    type="number"
+                    min="1"
+                    max="20"
+                    step="1"
+                    value={section.lineCount}
+                    onChange={(event) =>
+                      onPatchZoomSection(section.id, {
+                        lineCount: Number(event.target.value),
+                      })
+                    }
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="danger full-span"
+                  onClick={() => onDeleteZoomSection(section.id)}
+                >
+                  Delete zoom
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="panel-section">
         <h2>Import / export</h2>
         <div className="toolbar wrap">
           <button type="button" onClick={() => onExportDocument('yaml')}>
@@ -285,22 +378,11 @@ function ControlPanel({
           <button type="button" onClick={() => onExportDocument('json')}>
             Export JSON
           </button>
+          <button type="button" onClick={() => onExportDocument('xml')}>
+            Export XML
+          </button>
           <button type="button" onClick={onImportClick}>
             Import file
-          </button>
-        </div>
-        <div className="toolbar wrap">
-          <button type="button" onClick={() => onExportImage('png', true)}>
-            PNG
-          </button>
-          <button type="button" onClick={() => onExportImage('png', false)}>
-            PNG transparent
-          </button>
-          <button type="button" onClick={() => onExportImage('jpg', true)}>
-            JPG
-          </button>
-          <button type="button" onClick={() => onExportImage('svg', true)}>
-            SVG
           </button>
         </div>
         <div className="toolbar wrap">

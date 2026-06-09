@@ -1,5 +1,10 @@
 import { defaultTimeline } from '../sampleData'
-import type { TimelineDocument, TimelineEvent } from '../types'
+import type {
+  TimelineDocument,
+  TimelineEvent,
+  TimelineSettings,
+  TimelineZoomSection,
+} from '../types'
 
 /**
  * Creates a blank event anchored to the provided date.
@@ -123,6 +128,11 @@ export function normalizeDocument(input: unknown): TimelineDocument {
       },
     },
     events: normalizedEvents,
+    zoomSections: Array.isArray(parsed.zoomSections)
+      ? parsed.zoomSections
+          .map((section) => normalizeZoomSection(section, fallback.settings))
+          .filter((section) => section !== null)
+      : [],
   }
 }
 
@@ -161,6 +171,47 @@ export function toDateTimeLocalValue(value: string) {
  */
 export function safeFilename(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'timeline'
+}
+
+export function documentToXml(document: TimelineDocument) {
+  return `<?xml version="1.0" encoding="UTF-8"?>\n${valueToXml('timelineDocument', document)}`
+}
+
+function valueToXml(name: string, value: unknown, indent = ''): string {
+  if (Array.isArray(value)) {
+    return `${indent}<${name}>\n${value
+      .map((item) => valueToXml('item', item, `${indent}  `))
+      .join('\n')}\n${indent}</${name}>`
+  }
+
+  if (value && typeof value === 'object') {
+    const entries = Object.entries(value)
+    return `${indent}<${name}>\n${entries
+      .map(
+        ([key, item]) =>
+          `${indent}  <field name="${escapeXml(key)}">\n${valueToXml(
+            'value',
+            item,
+            `${indent}    `,
+          )}\n${indent}  </field>`,
+      )
+      .join('\n')}\n${indent}</${name}>`
+  }
+
+  if (value === undefined) {
+    return `${indent}<${name}/>`
+  }
+
+  return `${indent}<${name}>${escapeXml(String(value))}</${name}>`
+}
+
+function escapeXml(value: string) {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&apos;')
 }
 
 function normalizeEvent(input: unknown, index: number): TimelineEvent {
@@ -204,6 +255,51 @@ function normalizeEvent(input: unknown, index: number): TimelineEvent {
       x: typeof parsed.offset?.x === 'number' ? parsed.offset.x : 0,
       y: typeof parsed.offset?.y === 'number' ? parsed.offset.y : 0,
     },
+  }
+}
+
+function normalizeZoomSection(
+  input: unknown,
+  fallbackSettings: TimelineSettings,
+): TimelineZoomSection | null {
+  if (!input || typeof input !== 'object') {
+    return null
+  }
+
+  const parsed = input as Partial<TimelineZoomSection>
+  if (
+    !isValidDateString(parsed.startDate) ||
+    !isValidDateString(parsed.endDate) ||
+    new Date(parsed.endDate).getTime() <= new Date(parsed.startDate).getTime()
+  ) {
+    return null
+  }
+
+  const offsets =
+    parsed.offsets && typeof parsed.offsets === 'object'
+      ? Object.fromEntries(
+          Object.entries(parsed.offsets).flatMap(([eventId, offset]) =>
+            offset && typeof offset.x === 'number' && typeof offset.y === 'number'
+              ? [[eventId, { x: offset.x, y: offset.y }]]
+              : [],
+          ),
+        )
+      : {}
+
+  return {
+    id: typeof parsed.id === 'string' ? parsed.id : crypto.randomUUID(),
+    title: typeof parsed.title === 'string' ? parsed.title : 'Zoom section',
+    startDate: parsed.startDate,
+    endDate: parsed.endDate,
+    timelineLength:
+      typeof parsed.timelineLength === 'number' && Number.isFinite(parsed.timelineLength)
+        ? Math.max(1, parsed.timelineLength)
+        : fallbackSettings.timelineLength,
+    lineCount:
+      typeof parsed.lineCount === 'number' && Number.isFinite(parsed.lineCount)
+        ? clampLineCount(parsed.lineCount)
+        : fallbackSettings.lineCount,
+    offsets,
   }
 }
 

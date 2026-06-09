@@ -7,17 +7,19 @@ import StagePreview from './components/StagePreview'
 import { defaultTimeline } from './sampleData'
 import {
   createEvent,
+  documentToXml,
   getBoundsForEvents,
   normalizeDocument,
   safeFilename,
   toDateTimeLocalValue,
 } from './lib/document'
 import { toSvgPoint } from './lib/svg'
-import type { EventLayout, TimelineDocument, TimelineEvent } from './types'
-import { downloadTextFile, exportSvgElement } from './utils/export'
+import type { EventLayout, TimelineDocument, TimelineEvent, TimelineZoomSection } from './types'
+import { downloadTextFile } from './utils/export'
 import { computeTimelineLayout } from './utils/timeline'
 
 interface DragState {
+  sectionId: string
   eventId: string
   pointerId: number
   originX: number
@@ -33,16 +35,32 @@ function App() {
   const [selectedEventId, setSelectedEventId] = useState<string>(
     defaultTimeline.events[0]?.id ?? '',
   )
+  const [selectedSectionId, setSelectedSectionId] = useState('main')
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
   const [dragState, setDragState] = useState<DragState | null>(null)
   const [message, setMessage] = useState('Ready.')
-  const svgRef = useRef<SVGSVGElement | null>(null)
-  const exportSurfaceRef = useRef<HTMLDivElement | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
-  const layout = computeTimelineLayout(documentState)
   const selectedEvent = documentState.events.find((event) => event.id === selectedEventId)
-  const eventLookup = new Map(layout.events.map((entry) => [entry.event.id, entry]))
+  const previews = [
+    {
+      id: 'main',
+      title: documentState.settings.title,
+      document: documentState,
+    },
+    ...documentState.zoomSections.map((section) => ({
+      id: section.id,
+      title: section.title,
+      document: createZoomDocument(documentState, section),
+    })),
+  ].map((preview) => {
+    const layout = computeTimelineLayout(preview.document)
+    return {
+      ...preview,
+      layout,
+      eventLookup: new Map(layout.events.map((entry) => [entry.event.id, entry])),
+    }
+  })
 
   function patchSettings<K extends keyof TimelineDocument['settings']>(
     key: K,
@@ -95,6 +113,13 @@ function App() {
 
   function openDrawerFor(eventId: string) {
     setSelectedEventId(eventId)
+    setSelectedSectionId('main')
+    setIsDrawerOpen(true)
+  }
+
+  function openDrawerForSection(sectionId: string, eventId: string) {
+    setSelectedEventId(eventId)
+    setSelectedSectionId(sectionId)
     setIsDrawerOpen(true)
   }
 
@@ -149,6 +174,11 @@ function App() {
       return {
         ...current,
         events: remaining,
+        zoomSections: current.zoomSections.map((section) => {
+          const offsets = { ...section.offsets }
+          delete offsets[selectedEvent.id]
+          return { ...section, offsets }
+        }),
       }
     })
 
@@ -159,7 +189,11 @@ function App() {
   }
 
   function resetSelectedOffset() {
-    patchSelectedEvent({ offset: { x: 0, y: 0 } })
+    if (selectedSectionId !== 'main') {
+      patchZoomOffset(selectedSectionId, selectedEvent?.id ?? '', { x: 0, y: 0 })
+    } else {
+      patchSelectedEvent({ offset: { x: 0, y: 0 } })
+    }
     setMessage('Selected event position reset.')
   }
 
@@ -170,6 +204,7 @@ function App() {
         ...event,
         offset: { x: 0, y: 0 },
       })),
+      zoomSections: current.zoomSections.map((section) => ({ ...section, offsets: {} })),
     }))
     setMessage('All event positions reset.')
   }
@@ -195,7 +230,7 @@ function App() {
     setMessage('Sample timeline restored.')
   }
 
-  function handleExportDocument(format: 'yaml' | 'json') {
+  function handleExportDocument(format: 'yaml' | 'json' | 'xml') {
     const filename = safeFilename(documentState.settings.title || 'timeline')
     if (format === 'yaml') {
       downloadTextFile(
@@ -207,33 +242,22 @@ function App() {
       return
     }
 
-    downloadTextFile(
-      `${filename}.timeline.json`,
-      JSON.stringify(documentState, null, 2),
-      'application/json;charset=utf-8',
-    )
-    setMessage('JSON exported.')
-  }
-
-  async function handleExportImage(format: 'png' | 'jpg' | 'svg', includeBackground: boolean) {
-    if (!svgRef.current) {
+    if (format === 'json') {
+      downloadTextFile(
+        `${filename}.timeline.json`,
+        JSON.stringify(documentState, null, 2),
+        'application/json;charset=utf-8',
+      )
+      setMessage('JSON exported.')
       return
     }
 
-    try {
-      const filename = safeFilename(documentState.settings.title || 'timeline')
-      await exportSvgElement(
-        svgRef.current,
-        exportSurfaceRef.current,
-        format,
-        includeBackground ? filename : `${filename}-transparent`,
-        includeBackground,
-        documentState.settings.theme.background,
-      )
-      setMessage(`${format.toUpperCase()} exported.`)
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Export failed.')
-    }
+    downloadTextFile(
+      `${filename}.timeline.xml`,
+      documentToXml(documentState),
+      'application/xml;charset=utf-8',
+    )
+    setMessage('XML exported.')
   }
 
   function handleImportClick() {
@@ -265,8 +289,12 @@ function App() {
     }
   }
 
-  function handlePointerDown(layoutEvent: EventLayout, event: PointerEvent<SVGGElement>) {
-    const svg = svgRef.current
+  function handlePointerDown(
+    sectionId: string,
+    layoutEvent: EventLayout,
+    event: PointerEvent<SVGGElement>,
+  ) {
+    const svg = event.currentTarget.ownerSVGElement
     if (!svg) {
       return
     }
@@ -274,7 +302,9 @@ function App() {
     event.stopPropagation()
     const point = toSvgPoint(svg, event.clientX, event.clientY)
     setSelectedEventId(layoutEvent.event.id)
+    setSelectedSectionId(sectionId)
     setDragState({
+      sectionId,
       eventId: layoutEvent.event.id,
       pointerId: event.pointerId,
       originX: point.x,
@@ -285,44 +315,89 @@ function App() {
     event.currentTarget.setPointerCapture(event.pointerId)
   }
 
-  function handleCanvasPointerDown() {
+  function handleCanvasPointerDown(sectionId: string) {
     setSelectedEventId('')
+    setSelectedSectionId(sectionId)
     setIsDrawerOpen(false)
   }
 
-  function handlePointerMove(event: PointerEvent<SVGSVGElement>) {
-    const svg = svgRef.current
-    if (!svg || !dragState || dragState.pointerId !== event.pointerId) {
+  function handlePointerMove(sectionId: string, event: PointerEvent<SVGSVGElement>) {
+    if (!dragState || dragState.sectionId !== sectionId || dragState.pointerId !== event.pointerId) {
       return
     }
 
-    const point = toSvgPoint(svg, event.clientX, event.clientY)
+    const point = toSvgPoint(event.currentTarget, event.clientX, event.clientY)
     const deltaX = point.x - dragState.originX
     const deltaY = point.y - dragState.originY
 
-    setDocumentState((current) => ({
-      ...current,
-      events: current.events.map((timelineEvent) =>
-        timelineEvent.id === dragState.eventId
-          ? {
-              ...timelineEvent,
-              offset: {
-                x: Math.round(dragState.startOffsetX + deltaX),
-                y: Math.round(dragState.startOffsetY + deltaY),
-              },
-            }
-          : timelineEvent,
-      ),
-    }))
+    const offset = {
+      x: Math.round(dragState.startOffsetX + deltaX),
+      y: Math.round(dragState.startOffsetY + deltaY),
+    }
+    if (sectionId === 'main') {
+      setDocumentState((current) => ({
+        ...current,
+        events: current.events.map((timelineEvent) =>
+          timelineEvent.id === dragState.eventId ? { ...timelineEvent, offset } : timelineEvent,
+        ),
+      }))
+    } else {
+      patchZoomOffset(sectionId, dragState.eventId, offset)
+    }
   }
 
-  function handlePointerUp(event: PointerEvent<SVGSVGElement>) {
-    if (!dragState || dragState.pointerId !== event.pointerId) {
+  function handlePointerUp(sectionId: string, event: PointerEvent<SVGSVGElement>) {
+    if (!dragState || dragState.sectionId !== sectionId || dragState.pointerId !== event.pointerId) {
       return
     }
 
     setDragState(null)
     setMessage('Event moved. Use reset to restore automatic placement.')
+  }
+
+  function patchZoomOffset(sectionId: string, eventId: string, offset: TimelineEvent['offset']) {
+    setDocumentState((current) => ({
+      ...current,
+      zoomSections: current.zoomSections.map((section) =>
+        section.id === sectionId
+          ? { ...section, offsets: { ...section.offsets, [eventId]: offset } }
+          : section,
+      ),
+    }))
+  }
+
+  function addZoomSection() {
+    const start = new Date(documentState.settings.startDate).getTime()
+    const end = new Date(documentState.settings.endDate).getTime()
+    const section: TimelineZoomSection = {
+      id: crypto.randomUUID(),
+      title: `Zoom ${documentState.zoomSections.length + 1}`,
+      startDate: new Date(start + (end - start) * 0.25).toISOString(),
+      endDate: new Date(start + (end - start) * 0.75).toISOString(),
+      timelineLength: documentState.settings.timelineLength,
+      lineCount: documentState.settings.lineCount,
+      offsets: {},
+    }
+    setDocumentState((current) => ({ ...current, zoomSections: [...current.zoomSections, section] }))
+  }
+
+  function patchZoomSection(sectionId: string, patch: Partial<TimelineZoomSection>) {
+    setDocumentState((current) => ({
+      ...current,
+      zoomSections: current.zoomSections.map((section) =>
+        section.id === sectionId ? { ...section, ...patch } : section,
+      ),
+    }))
+  }
+
+  function deleteZoomSection(sectionId: string) {
+    setDocumentState((current) => ({
+      ...current,
+      zoomSections: current.zoomSections.filter((section) => section.id !== sectionId),
+    }))
+    if (selectedSectionId === sectionId) {
+      setSelectedSectionId('main')
+    }
   }
 
   return (
@@ -340,27 +415,34 @@ function App() {
           onPatchTheme={patchTheme}
           onOpenDrawerFor={openDrawerFor}
           onExportDocument={handleExportDocument}
-          onExportImage={handleExportImage}
+          onAddZoomSection={addZoomSection}
+          onPatchZoomSection={patchZoomSection}
+          onDeleteZoomSection={deleteZoomSection}
           onResetAllOffsets={resetAllOffsets}
           onRestoreSample={handleRestoreSample}
           onImportClick={handleImportClick}
           onImportFile={handleImportFile}
           toDateTimeLocalValue={toDateTimeLocalValue}
         />
-        <StagePreview
-          documentState={documentState}
-          selectedEvent={selectedEvent}
-          layout={layout}
-          message={message}
-          svgRef={svgRef}
-          exportSurfaceRef={exportSurfaceRef}
-          eventLookup={eventLookup}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-          onCanvasPointerDown={handleCanvasPointerDown}
-          onPointerDown={handlePointerDown}
-          onOpenDrawerFor={openDrawerFor}
-        />
+        <main className="preview-stack">
+          <p className="status preview-status">{message}</p>
+          {previews.map((preview) => (
+            <StagePreview
+              key={preview.id}
+              sectionId={preview.id}
+              title={preview.title}
+              documentState={preview.document}
+              selectedEvent={selectedEvent}
+              layout={preview.layout}
+              eventLookup={preview.eventLookup}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
+              onCanvasPointerDown={handleCanvasPointerDown}
+              onPointerDown={handlePointerDown}
+              onOpenDrawerFor={openDrawerForSection}
+            />
+          ))}
+        </main>
       </div>
 
       {selectedEvent ? (
@@ -376,6 +458,37 @@ function App() {
       ) : null}
     </>
   )
+}
+
+function createZoomDocument(
+  documentState: TimelineDocument,
+  section: TimelineZoomSection,
+): TimelineDocument {
+  const start = new Date(section.startDate).getTime()
+  const end = new Date(section.endDate).getTime()
+  const events = documentState.events
+    .filter((event) => {
+      const eventStart = new Date(event.date).getTime()
+      const eventEnd = new Date(event.endDate ?? event.date).getTime()
+      return eventStart <= end && eventEnd >= start
+    })
+    .map((event) => ({
+      ...event,
+      offset: section.offsets[event.id] ?? { x: 0, y: 0 },
+    }))
+
+  return {
+    ...documentState,
+    settings: {
+      ...documentState.settings,
+      title: section.title,
+      startDate: section.startDate,
+      endDate: section.endDate,
+      timelineLength: section.timelineLength,
+      lineCount: section.lineCount,
+    },
+    events,
+  }
 }
 
 export default App

@@ -14,8 +14,9 @@ It renders a responsive SVG timeline with:
 - markdown descriptions
 - event editing in a drawer
 - drag-and-drop fine tuning with reset
-- import/export as YAML or JSON
+- import/export as YAML or JSON, plus XML export
 - image export as PNG, transparent PNG, JPG, and SVG
+- persisted zoom sections with independent card placement
 
 ## Stack
 
@@ -53,7 +54,8 @@ npm run preview
 5. Use the `Caused by` checklist on an event to create dependency arrows.
 6. Drag cards in the preview if automatic placement needs a manual adjustment.
 7. Use `Reset position` or `Reset all positions` to restore automatic layout.
-8. Export the source timeline as YAML or JSON, and export the rendered visual as SVG/PNG/JPG.
+8. Add zoom sections to create focused previews for selected date windows.
+9. Export the source timeline as YAML, JSON, or XML. Export each preview separately as SVG/PNG/JPG.
 
 ## Timeline document format
 
@@ -103,6 +105,17 @@ events:
     offset:
       x: 0
       y: 0
+zoomSections:
+  - id: zoom-1
+    title: Initial response
+    startDate: 2026-05-01T08:00:00Z
+    endDate: 2026-05-01T12:00:00Z
+    timelineLength: 900
+    lineCount: 1
+    offsets:
+      evt-1:
+        x: 20
+        y: 0
 ```
 
 ### Notes
@@ -118,6 +131,9 @@ events:
 - `endDate`: optional end timestamp; when present, the event is rendered as a range
 - `offset`: manual drag adjustment applied on top of automatic placement
 - `style.side`: `auto`, `above`, `below`, `left`, or `right`
+- `zoomSections`: focused date windows rendered below the main preview
+- `zoomSections[].offsets`: independent drag positions for events in that zoom preview
+- `zoomSections[].timelineLength` / `lineCount`: independent zoom preview dimensions
 
 ## Code structure
 

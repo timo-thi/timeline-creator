@@ -1,5 +1,7 @@
-import { type CSSProperties, type PointerEvent, type RefObject } from 'react'
+import { type CSSProperties, type PointerEvent, useRef } from 'react'
+import { safeFilename } from '../lib/document'
 import type { EventLayout, TimelineDocument, TimelineEvent, TimelineLayout } from '../types'
+import { exportSvgElement } from '../utils/export'
 import { renderMarkdown } from '../utils/markdown'
 import {
   buildDependencyPath,
@@ -8,27 +10,29 @@ import {
 } from '../utils/timeline'
 
 interface StagePreviewProps {
+  sectionId: string
+  title: string
   documentState: TimelineDocument
   selectedEvent?: TimelineEvent
   layout: TimelineLayout
-  message: string
-  svgRef: RefObject<SVGSVGElement | null>
-  exportSurfaceRef: RefObject<HTMLDivElement | null>
   eventLookup: Map<string, EventLayout>
-  onPointerMove: (event: PointerEvent<SVGSVGElement>) => void
-  onPointerUp: (event: PointerEvent<SVGSVGElement>) => void
-  onCanvasPointerDown: (event: PointerEvent<SVGSVGElement>) => void
-  onPointerDown: (layoutEvent: EventLayout, event: PointerEvent<SVGGElement>) => void
-  onOpenDrawerFor: (eventId: string) => void
+  onPointerMove: (sectionId: string, event: PointerEvent<SVGSVGElement>) => void
+  onPointerUp: (sectionId: string, event: PointerEvent<SVGSVGElement>) => void
+  onCanvasPointerDown: (sectionId: string, event: PointerEvent<SVGSVGElement>) => void
+  onPointerDown: (
+    sectionId: string,
+    layoutEvent: EventLayout,
+    event: PointerEvent<SVGGElement>,
+  ) => void
+  onOpenDrawerFor: (sectionId: string, eventId: string) => void
 }
 
 function StagePreview({
+  sectionId,
+  title,
   documentState,
   selectedEvent,
   layout,
-  message,
-  svgRef,
-  exportSurfaceRef,
   eventLookup,
   onPointerMove,
   onPointerUp,
@@ -36,12 +40,31 @@ function StagePreview({
   onPointerDown,
   onOpenDrawerFor,
 }: StagePreviewProps) {
+  const svgRef = useRef<SVGSVGElement | null>(null)
+  const exportSurfaceRef = useRef<HTMLDivElement | null>(null)
+
+  async function exportImage(format: 'png' | 'jpg' | 'svg', includeBackground: boolean) {
+    if (!svgRef.current) {
+      return
+    }
+
+    const filename = safeFilename(title)
+    await exportSvgElement(
+      svgRef.current,
+      exportSurfaceRef.current,
+      format,
+      includeBackground ? filename : `${filename}-transparent`,
+      includeBackground,
+      documentState.settings.theme.background,
+    )
+  }
+
   return (
-    <main className="stage">
+    <section className="stage preview-section">
       <header className="stage-header">
         <div>
-          <p className="eyebrow">Preview</p>
-          <h2>{documentState.settings.title}</h2>
+          <p className="eyebrow">{sectionId === 'main' ? 'Main preview' : 'Zoom preview'}</p>
+          <h2>{title}</h2>
           <p className="status">
             {formatAxisDate(
               new Date(documentState.settings.startDate).getTime(),
@@ -54,7 +77,12 @@ function StagePreview({
             )}
           </p>
         </div>
-        <p className="status">{message}</p>
+        <div className="toolbar">
+          <button type="button" onClick={() => void exportImage('png', true)}>PNG</button>
+          <button type="button" onClick={() => void exportImage('png', false)}>PNG transparent</button>
+          <button type="button" onClick={() => void exportImage('jpg', true)}>JPG</button>
+          <button type="button" onClick={() => void exportImage('svg', true)}>SVG</button>
+        </div>
       </header>
 
       <div className="canvas-frame compact-frame">
@@ -69,10 +97,10 @@ function StagePreview({
             height={layout.height}
             viewBox={`0 0 ${layout.width} ${layout.height}`}
             className="timeline-svg"
-            onPointerDown={onCanvasPointerDown}
-            onPointerMove={onPointerMove}
-            onPointerUp={onPointerUp}
-            onPointerCancel={onPointerUp}
+            onPointerDown={(event) => onCanvasPointerDown(sectionId, event)}
+            onPointerMove={(event) => onPointerMove(sectionId, event)}
+            onPointerUp={(event) => onPointerUp(sectionId, event)}
+            onPointerCancel={(event) => onPointerUp(sectionId, event)}
           >
           <defs>
             <marker
@@ -309,8 +337,8 @@ function StagePreview({
                 className={
                   eventLayout.event.id === selectedEvent?.id ? 'timeline-card active' : 'timeline-card'
                 }
-                onPointerDown={(event) => onPointerDown(eventLayout, event)}
-                onDoubleClick={() => onOpenDrawerFor(eventLayout.event.id)}
+                onPointerDown={(event) => onPointerDown(sectionId, eventLayout, event)}
+                onDoubleClick={() => onOpenDrawerFor(sectionId, eventLayout.event.id)}
               >
                 <rect
                   x={eventLayout.anchorX}
@@ -398,7 +426,7 @@ function StagePreview({
           <span>Open an event from the list or double-click a card to edit it in the drawer.</span>
         </div>
       </section>
-    </main>
+    </section>
   )
 }
 

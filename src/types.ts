@@ -54,10 +54,21 @@ export interface TimelineEvent {
   offset: TimelineEventOffset
 }
 
+export interface TimelineZoomSection {
+  id: string
+  title: string
+  startDate: string
+  endDate: string
+  timelineLength: number
+  lineCount: number
+  offsets: Record<string, TimelineEventOffset>
+}
+
 export interface TimelineDocument {
   version: number
   settings: TimelineSettings
   events: TimelineEvent[]
+  zoomSections: TimelineZoomSection[]
 }
 
 export interface EventLayout {

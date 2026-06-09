@@ -309,6 +309,38 @@ h2 {
   min-width: 0;
 }
 
+.preview-stack {
+  display: grid;
+  align-content: start;
+  gap: 1.25rem;
+  min-width: 0;
+  overflow: auto;
+}
+
+.preview-section {
+  min-height: min(100vh, 48rem);
+  border-bottom: 1px solid rgba(103, 76, 49, 0.16);
+}
+
+.preview-status {
+  margin: 1rem 1rem 0;
+}
+
+.zoom-section-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.zoom-section-editor {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+  padding: 0.75rem;
+  border: 1px solid rgba(116, 84, 52, 0.16);
+  border-radius: 16px;
+  background: rgba(255, 253, 249, 0.72);
+}
+
 .stage-header {
   display: flex;
   justify-content: space-between;
@@ -494,7 +526,8 @@ code {
 
   .compact-grid,
   .legend,
-  .color-row {
+  .color-row,
+  .zoom-section-editor {
     grid-template-columns: 1fr;
   }
 
