@@ -15,6 +15,7 @@ export function downloadTextFile(filename: string, contents: string, mimeType: s
  */
 export function serializeSvg(svg: SVGSVGElement, includeBackground: boolean) {
   const clone = svg.cloneNode(true) as SVGSVGElement
+  cleanExportState(clone)
   clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
   clone.setAttribute('xmlns:xhtml', 'http://www.w3.org/1999/xhtml')
 
@@ -155,12 +156,14 @@ function ensureHtmlExportTarget(
   includeBackground: boolean,
   backgroundColor: string,
 ) {
-  if (node instanceof HTMLElement) {
-    return node
-  }
-
-  const width = Number(node.getAttribute('width')) || node.viewBox.baseVal.width
-  const height = Number(node.getAttribute('height')) || node.viewBox.baseVal.height
+  const width =
+    node instanceof SVGSVGElement
+      ? Number(node.getAttribute('width')) || node.viewBox.baseVal.width
+      : node.clientWidth || node.scrollWidth
+  const height =
+    node instanceof SVGSVGElement
+      ? Number(node.getAttribute('height')) || node.viewBox.baseVal.height
+      : node.clientHeight || node.scrollHeight
   const wrapper = document.createElement('div')
   wrapper.dataset.temporaryExportTarget = 'true'
   wrapper.style.position = 'fixed'
@@ -171,7 +174,21 @@ function ensureHtmlExportTarget(
   wrapper.style.background = includeBackground ? backgroundColor : 'transparent'
   wrapper.style.pointerEvents = 'none'
   wrapper.style.lineHeight = '0'
-  wrapper.appendChild(node.cloneNode(true))
+  const clone = node.cloneNode(true) as HTMLElement | SVGSVGElement
+  cleanExportState(clone)
+  wrapper.appendChild(clone)
   document.body.appendChild(wrapper)
   return wrapper
+}
+
+function cleanExportState(root: Element) {
+  root.querySelectorAll('[data-export-stroke]').forEach((node) => {
+    node.setAttribute('stroke', node.getAttribute('data-export-stroke') ?? 'none')
+    node.removeAttribute('data-export-stroke')
+  })
+  root.querySelectorAll('[data-export-stroke-width]').forEach((node) => {
+    node.setAttribute('stroke-width', node.getAttribute('data-export-stroke-width') ?? '1')
+    node.removeAttribute('data-export-stroke-width')
+  })
+  root.querySelectorAll('.active').forEach((node) => node.classList.remove('active'))
 }

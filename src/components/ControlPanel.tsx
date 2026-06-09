@@ -277,6 +277,14 @@ function ControlPanel({
           <button type="button" className="ghost" onClick={onResetAllOffsets}>
             Reset all positions
           </button>
+          <label className="checkbox">
+            <input
+              type="checkbox"
+              checked={documentState.settings.groupRelatedEvents}
+              onChange={(event) => onPatchSetting('groupRelatedEvents', event.target.checked)}
+            />
+            <span>Group related events</span>
+          </label>
           <button type="button" className="ghost" onClick={onRestoreSample}>
             Load sample
           </button>

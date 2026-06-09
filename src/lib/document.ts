@@ -76,6 +76,8 @@ export function normalizeDocument(input: unknown): TimelineDocument {
         typeof settings.cardWidth === 'number'
           ? settings.cardWidth
           : fallback.settings.cardWidth,
+      groupRelatedEvents:
+        typeof settings.groupRelatedEvents === 'boolean' ? settings.groupRelatedEvents : true,
       showBackground:
         typeof settings.showBackground === 'boolean'
           ? settings.showBackground

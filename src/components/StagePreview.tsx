@@ -17,6 +17,7 @@ interface StagePreviewProps {
   eventLookup: Map<string, EventLayout>
   onPointerMove: (event: PointerEvent<SVGSVGElement>) => void
   onPointerUp: (event: PointerEvent<SVGSVGElement>) => void
+  onCanvasPointerDown: (event: PointerEvent<SVGSVGElement>) => void
   onPointerDown: (layoutEvent: EventLayout, event: PointerEvent<SVGGElement>) => void
   onOpenDrawerFor: (eventId: string) => void
 }
@@ -31,6 +32,7 @@ function StagePreview({
   eventLookup,
   onPointerMove,
   onPointerUp,
+  onCanvasPointerDown,
   onPointerDown,
   onOpenDrawerFor,
 }: StagePreviewProps) {
@@ -67,6 +69,7 @@ function StagePreview({
             height={layout.height}
             viewBox={`0 0 ${layout.width} ${layout.height}`}
             className="timeline-svg"
+            onPointerDown={onCanvasPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
             onPointerCancel={onPointerUp}
@@ -278,6 +281,8 @@ function StagePreview({
                   fill={cardTheme.surface}
                   stroke={eventLayout.event.id === selectedEvent?.id ? cardTheme.accent : cardTheme.border}
                   strokeWidth={eventLayout.event.id === selectedEvent?.id ? '2.5' : '1.5'}
+                  data-export-stroke={cardTheme.border}
+                  data-export-stroke-width="1.5"
                   filter="drop-shadow(0 18px 30px rgba(37, 28, 18, 0.12))"
                 />
                 <rect

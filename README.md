@@ -72,6 +72,7 @@ settings:
   lineCount: 2
   majorTickUnit: hour
   cardWidth: 260
+  groupRelatedEvents: true
   showBackground: true
   showGrid: true
   theme:
@@ -111,6 +112,7 @@ events:
 - `lineCount`: number of equal-length rows or columns used by the timeline
 - `majorTickUnit`: `hour`, `day`, `week`, or `month`
 - `causes`: list of earlier event IDs that explain this event
+- `groupRelatedEvents`: keeps causally connected events on the same side during automatic placement
 - `endDate`: optional end timestamp; when present, the event is rendered as a range
 - `offset`: manual drag adjustment applied on top of automatic placement
 - `style.side`: `auto`, `above`, `below`, `left`, or `right`

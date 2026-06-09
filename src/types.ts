@@ -22,6 +22,7 @@ export interface TimelineSettings {
   lineCount: number
   majorTickUnit: TimelineTickUnit
   cardWidth: number
+  groupRelatedEvents: boolean
   showBackground: boolean
   showGrid: boolean
   theme: TimelineTheme

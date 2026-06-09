@@ -41,8 +41,7 @@ function App() {
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   const layout = computeTimelineLayout(documentState)
-  const selectedEvent =
-    documentState.events.find((event) => event.id === selectedEventId) ?? documentState.events[0]
+  const selectedEvent = documentState.events.find((event) => event.id === selectedEventId)
   const eventLookup = new Map(layout.events.map((entry) => [entry.event.id, entry]))
 
   function patchSettings<K extends keyof TimelineDocument['settings']>(
@@ -286,6 +285,11 @@ function App() {
     event.currentTarget.setPointerCapture(event.pointerId)
   }
 
+  function handleCanvasPointerDown() {
+    setSelectedEventId('')
+    setIsDrawerOpen(false)
+  }
+
   function handlePointerMove(event: PointerEvent<SVGSVGElement>) {
     const svg = svgRef.current
     if (!svg || !dragState || dragState.pointerId !== event.pointerId) {
@@ -353,6 +357,7 @@ function App() {
           eventLookup={eventLookup}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
+          onCanvasPointerDown={handleCanvasPointerDown}
           onPointerDown={handlePointerDown}
           onOpenDrawerFor={openDrawerFor}
         />

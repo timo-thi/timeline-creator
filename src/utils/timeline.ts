@@ -78,6 +78,7 @@ export function computeTimelineLayout(document: TimelineDocument): TimelineLayou
     ? clamp(Math.round(document.settings.lineCount), 1, MAX_LINE_COUNT)
     : 1
   const cumulativeLength = lineLength * segmentCount
+  const relatedGroupIndexes = buildRelatedGroupIndexes(sortedEvents)
 
   const lanesPerSegment: SegmentLanes[] = Array.from({ length: segmentCount }, () => ({
     before: [],
@@ -95,7 +96,10 @@ export function computeTimelineLayout(document: TimelineDocument): TimelineLayou
     )
     const cardWidth = Math.max(180, event.style.width ?? document.settings.cardWidth)
     const { cardHeight, headerHeight } = estimateCardDimensions(event, cardWidth)
-    const side = resolveSide(event.style.side, direction, pending.length)
+    const placementIndex = document.settings.groupRelatedEvents
+      ? relatedGroupIndexes.get(event.id) ?? pending.length
+      : pending.length
+    const side = resolveSide(event.style.side, direction, placementIndex)
     const sideKey = side === 'above' || side === 'left' ? 'before' : 'after'
     const cardMainSize = direction === 'horizontal' ? cardWidth : cardHeight
     const cardCrossSize = direction === 'horizontal' ? cardHeight : cardWidth
@@ -686,6 +690,50 @@ function resolveSide(
   }
 
   return index % 2 === 0 ? 'left' : 'right'
+}
+
+function buildRelatedGroupIndexes(events: TimelineEvent[]) {
+  const parents = new Map(events.map((event) => [event.id, event.id]))
+  const eventIds = new Set(parents.keys())
+
+  function find(id: string): string {
+    const parent = parents.get(id) ?? id
+    if (parent === id) {
+      return id
+    }
+
+    const root = find(parent)
+    parents.set(id, root)
+    return root
+  }
+
+  function union(first: string, second: string) {
+    const firstRoot = find(first)
+    const secondRoot = find(second)
+    if (firstRoot !== secondRoot) {
+      parents.set(secondRoot, firstRoot)
+    }
+  }
+
+  for (const event of events) {
+    for (const causeId of event.causes) {
+      if (eventIds.has(causeId)) {
+        union(causeId, event.id)
+      }
+    }
+  }
+
+  const groupIndexes = new Map<string, number>()
+  const roots = new Map<string, number>()
+  for (const event of events) {
+    const root = find(event.id)
+    if (!roots.has(root)) {
+      roots.set(root, roots.size)
+    }
+    groupIndexes.set(event.id, roots.get(root) ?? 0)
+  }
+
+  return groupIndexes
 }
 
 function placeInLane(lanes: LaneLayout[], start: number, end: number, cardCrossSize: number) {
