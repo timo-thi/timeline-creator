@@ -4,7 +4,7 @@ import { renderMarkdown } from '../utils/markdown'
 import {
   buildDependencyPath,
   formatAxisDate,
-  formatEventDateRange,
+  getEventDateLabels,
 } from '../utils/timeline'
 
 interface StagePreviewProps {
@@ -284,16 +284,30 @@ function StagePreview({
                   x={eventLayout.anchorX}
                   y={eventLayout.anchorY}
                   width={eventLayout.cardWidth}
-                  height="28"
+                  height={eventLayout.headerHeight}
                   rx="18"
                   fill={cardTheme.strip}
                   opacity="0.9"
                 />
                 <foreignObject
                   x={eventLayout.anchorX + 14}
-                  y={eventLayout.anchorY + 16}
+                  y={eventLayout.anchorY}
                   width={eventLayout.cardWidth - 28}
-                  height={eventLayout.cardHeight - 24}
+                  height={eventLayout.headerHeight}
+                >
+                  <div className="card-date">
+                    {getEventDateLabels(eventLayout.event).map((date, index) => (
+                      <div key={date.label ?? index}>
+                        {date.label ? <strong>{date.label}:</strong> : null} {date.value}
+                      </div>
+                    ))}
+                  </div>
+                </foreignObject>
+                <foreignObject
+                  x={eventLayout.anchorX + 14}
+                  y={eventLayout.anchorY + eventLayout.headerHeight + 10}
+                  width={eventLayout.cardWidth - 28}
+                  height={eventLayout.cardHeight - eventLayout.headerHeight - 16}
                 >
                   <div
                     className="card-html"
@@ -305,7 +319,6 @@ function StagePreview({
                       } as CSSProperties
                     }
                   >
-                    <div className="card-date">{formatEventDateRange(eventLayout.event)}</div>
                     <div className={hasDescription ? 'card-title' : 'card-title last'}>
                       {eventLayout.event.title || 'Untitled event'}
                     </div>

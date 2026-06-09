@@ -65,6 +65,7 @@ export interface EventLayout {
   y: number
   cardWidth: number
   cardHeight: number
+  headerHeight: number
   anchorX: number
   anchorY: number
   pointX: number

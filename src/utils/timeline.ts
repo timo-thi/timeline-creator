@@ -31,6 +31,7 @@ interface PendingEventLayout {
   pointOffset: number
   cardWidth: number
   cardHeight: number
+  headerHeight: number
   lane: number
   side: Exclude<EventSide, 'auto'>
 }
@@ -55,6 +56,11 @@ interface Rect {
   right: number
   top: number
   bottom: number
+}
+
+interface EventDateLabel {
+  label?: string
+  value: string
 }
 
 /**
@@ -88,7 +94,7 @@ export function computeTimelineLayout(document: TimelineDocument): TimelineLayou
       segmentCount,
     )
     const cardWidth = Math.max(180, event.style.width ?? document.settings.cardWidth)
-    const cardHeight = estimateCardHeight(event, cardWidth)
+    const { cardHeight, headerHeight } = estimateCardDimensions(event, cardWidth)
     const side = resolveSide(event.style.side, direction, pending.length)
     const sideKey = side === 'above' || side === 'left' ? 'before' : 'after'
     const cardMainSize = direction === 'horizontal' ? cardWidth : cardHeight
@@ -113,6 +119,7 @@ export function computeTimelineLayout(document: TimelineDocument): TimelineLayou
       pointOffset,
       cardWidth,
       cardHeight,
+      headerHeight,
       lane,
       side,
     })
@@ -327,6 +334,15 @@ export function formatEventDateRange(event: TimelineEvent): string {
     : formatEventDate(event.date)
 }
 
+export function getEventDateLabels(event: TimelineEvent): EventDateLabel[] {
+  return event.endDate
+    ? [
+        { label: 'From', value: formatEventDate(event.date) },
+        { label: 'To', value: formatEventDate(event.endDate) },
+      ]
+    : [{ value: formatEventDate(event.date) }]
+}
+
 export function formatAxisDate(timestamp: number, unit: TimelineTickUnit): string {
   const optionsByUnit: Record<TimelineTickUnit, Intl.DateTimeFormatOptions> = {
     hour: { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' },
@@ -458,6 +474,7 @@ function finalizeHorizontalEvent(
     y,
     cardWidth: item.cardWidth,
     cardHeight: item.cardHeight,
+    headerHeight: item.headerHeight,
     anchorX: x,
     anchorY: y,
     pointX,
@@ -488,6 +505,7 @@ function finalizeVerticalEvent(
     y,
     cardWidth: item.cardWidth,
     cardHeight: item.cardHeight,
+    headerHeight: item.headerHeight,
     anchorX: x,
     anchorY: y,
     pointX,
@@ -691,12 +709,22 @@ function placeInLane(lanes: LaneLayout[], start: number, end: number, cardCrossS
   return lanes.length - 1
 }
 
-function estimateCardHeight(event: TimelineEvent, cardWidth: number) {
+function estimateCardDimensions(event: TimelineEvent, cardWidth: number) {
   const contentWidth = cardWidth - 28
+  const dateLines = getEventDateLabels(event).reduce(
+    (total, date) =>
+      total +
+      estimateTextLines(date.label ? `${date.label}: ${date.value}` : date.value, contentWidth, 6.5),
+    0,
+  )
+  const headerHeight = Math.max(32, dateLines * 15 + 16)
   const titleLines = estimateTextLines(event.title || 'Untitled event', contentWidth, 8)
   const descriptionHeight = estimateMarkdownHeight(event.description, contentWidth)
 
-  return Math.ceil(CARD_PADDING * 2 + 24 + titleLines * 21 + descriptionHeight)
+  return {
+    cardHeight: Math.ceil(headerHeight + CARD_PADDING + titleLines * 21 + descriptionHeight),
+    headerHeight,
+  }
 }
 
 function estimateMarkdownHeight(markdown: string, contentWidth: number) {
