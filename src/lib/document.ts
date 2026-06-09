@@ -125,7 +125,10 @@ export function normalizeDocument(input: unknown): TimelineDocument {
  * Produces a timestamp window that comfortably covers the current events.
  */
 export function getBoundsForEvents(events: TimelineEvent[], fallback: TimelineDocument) {
-  const timestamps = events.map((event) => new Date(event.date).getTime())
+  const timestamps = events.flatMap((event) => [
+    new Date(event.date).getTime(),
+    ...(event.endDate ? [new Date(event.endDate).getTime()] : []),
+  ])
   const min = Math.min(...timestamps)
   const max = Math.max(...timestamps)
   return {
@@ -168,6 +171,7 @@ function normalizeEvent(input: unknown, index: number): TimelineEvent {
       typeof parsed.date === 'string' && !Number.isNaN(new Date(parsed.date).getTime())
         ? parsed.date
         : fallback.date,
+    endDate: isValidDateString(parsed.endDate) ? parsed.endDate : undefined,
     description: typeof parsed.description === 'string' ? parsed.description : '',
     causes: Array.isArray(parsed.causes)
       ? parsed.causes.filter((cause): cause is string => typeof cause === 'string')

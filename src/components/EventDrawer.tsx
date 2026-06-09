@@ -51,12 +51,27 @@ function EventDrawer({
             />
           </label>
           <label>
-            <span>Date</span>
+            <span>Start date</span>
             <input
               type="datetime-local"
               value={toDateTimeLocalValue(selectedEvent.date)}
               onChange={(event) =>
                 onPatchSelectedEvent({ date: new Date(event.target.value).toISOString() })
+              }
+            />
+          </label>
+          <label>
+            <span>End date (optional)</span>
+            <input
+              type="datetime-local"
+              min={toDateTimeLocalValue(selectedEvent.date)}
+              value={selectedEvent.endDate ? toDateTimeLocalValue(selectedEvent.endDate) : ''}
+              onChange={(event) =>
+                onPatchSelectedEvent({
+                  endDate: event.target.value
+                    ? new Date(event.target.value).toISOString()
+                    : undefined,
+                })
               }
             />
           </label>

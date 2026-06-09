@@ -45,6 +45,7 @@ export interface TimelineEvent {
   id: string
   title: string
   date: string
+  endDate?: string
   description: string
   causes: string[]
   style: TimelineEventStyle
@@ -90,6 +91,15 @@ export interface TickLayout {
   label: string
 }
 
+export interface EventRangeLayout {
+  eventId: string
+  segmentIndex: number
+  startX: number
+  startY: number
+  endX: number
+  endY: number
+}
+
 export interface TimelineLayout {
   width: number
   height: number
@@ -97,5 +107,6 @@ export interface TimelineLayout {
   maxDate: number
   segments: SegmentLayout[]
   ticks: TickLayout[]
+  ranges: EventRangeLayout[]
   events: EventLayout[]
 }

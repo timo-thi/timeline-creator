@@ -4,7 +4,7 @@ import { renderMarkdown } from '../utils/markdown'
 import {
   buildDependencyPath,
   formatAxisDate,
-  formatEventDate,
+  formatEventDateRange,
 } from '../utils/timeline'
 
 interface StagePreviewProps {
@@ -172,6 +172,25 @@ function StagePreview({
             </g>
           ))}
 
+          {layout.ranges.map((range) => {
+            const event = documentState.events.find((candidate) => candidate.id === range.eventId)
+            const accent = event?.style.accentColor ?? documentState.settings.theme.accent
+
+            return (
+              <line
+                key={`${range.eventId}-${range.segmentIndex}`}
+                x1={range.startX}
+                y1={range.startY}
+                x2={range.endX}
+                y2={range.endY}
+                stroke={accent}
+                strokeWidth="9"
+                strokeLinecap="round"
+                opacity="0.65"
+              />
+            )
+          })}
+
           {layout.events.map((eventLayout) => {
             const accent =
               eventLayout.event.style.accentColor ?? documentState.settings.theme.accent
@@ -286,7 +305,7 @@ function StagePreview({
                       } as CSSProperties
                     }
                   >
-                    <div className="card-date">{formatEventDate(eventLayout.event.date)}</div>
+                    <div className="card-date">{formatEventDateRange(eventLayout.event)}</div>
                     <div className={hasDescription ? 'card-title' : 'card-title last'}>
                       {eventLayout.event.title || 'Untitled event'}
                     </div>

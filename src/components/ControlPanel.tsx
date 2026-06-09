@@ -5,7 +5,7 @@ import type {
   TimelineEvent,
   TimelineTickUnit,
 } from '../types'
-import { formatEventDate } from '../utils/timeline'
+import { formatEventDateRange } from '../utils/timeline'
 
 type ThemeKey = keyof TimelineDocument['settings']['theme']
 
@@ -240,7 +240,7 @@ function ControlPanel({
                 onClick={() => onOpenDrawerFor(event.id)}
               >
                 <strong>{event.title || 'Untitled event'}</strong>
-                <span>{formatEventDate(event.date)}</span>
+                <span>{formatEventDateRange(event)}</span>
               </button>
             ))}
         </div>

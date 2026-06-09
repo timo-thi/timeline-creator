@@ -87,6 +87,7 @@ events:
   - id: evt-1
     title: Host seized
     date: 2026-05-01T08:15:00Z
+    endDate: 2026-05-01T09:00:00Z
     description: |
       Workstation seized during incident response.
 
@@ -110,6 +111,7 @@ events:
 - `lineCount`: number of equal-length rows or columns used by the timeline
 - `majorTickUnit`: `hour`, `day`, `week`, or `month`
 - `causes`: list of earlier event IDs that explain this event
+- `endDate`: optional end timestamp; when present, the event is rendered as a range
 - `offset`: manual drag adjustment applied on top of automatic placement
 - `style.side`: `auto`, `above`, `below`, `left`, or `right`
 

@@ -1,5 +1,6 @@
 import type {
   EventLayout,
+  EventRangeLayout,
   EventSide,
   SegmentLayout,
   TickLayout,
@@ -118,13 +119,22 @@ export function computeTimelineLayout(document: TimelineDocument): TimelineLayou
   }
 
   const segments = buildSegments(direction, lineLength, segmentCount, lanesPerSegment)
+  const rawRanges = buildEventRanges(
+    sortedEvents,
+    segments,
+    direction,
+    minDate,
+    maxDate,
+    cumulativeLength,
+    lineLength,
+  )
   const rawEvents = pending.map((item) =>
     direction === 'horizontal'
       ? finalizeHorizontalEvent(item, segments[item.segmentIndex], lanesPerSegment[item.segmentIndex])
       : finalizeVerticalEvent(item, segments[item.segmentIndex], lanesPerSegment[item.segmentIndex]),
   )
   const rawTicks = buildTicks(document, segments, minDate, maxDate, cumulativeLength, lineLength)
-  const normalized = normalizeLayoutBounds(document, segments, rawEvents, rawTicks)
+  const normalized = normalizeLayoutBounds(document, segments, rawEvents, rawTicks, rawRanges)
 
   return {
     width: normalized.width,
@@ -133,6 +143,7 @@ export function computeTimelineLayout(document: TimelineDocument): TimelineLayou
     maxDate,
     segments: normalized.segments,
     ticks: normalized.ticks,
+    ranges: normalized.ranges,
     events: normalized.events,
   }
 }
@@ -308,6 +319,12 @@ export function formatEventDate(date: string): string {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(new Date(date))
+}
+
+export function formatEventDateRange(event: TimelineEvent): string {
+  return event.endDate
+    ? `${formatEventDate(event.date)} to ${formatEventDate(event.endDate)}`
+    : formatEventDate(event.date)
 }
 
 export function formatAxisDate(timestamp: number, unit: TimelineTickUnit): string {
@@ -498,7 +515,10 @@ function getDateBounds(document: TimelineDocument, events: TimelineEvent[]) {
     }
   }
 
-  const timestamps = events.map((event) => new Date(event.date).getTime())
+  const timestamps = events.flatMap((event) => [
+    new Date(event.date).getTime(),
+    ...(event.endDate ? [new Date(event.endDate).getTime()] : []),
+  ])
   const min = Math.min(...timestamps)
   const max = Math.max(...timestamps)
   const span = Math.max(max - min, MIN_TIME_SPAN_MS)
@@ -529,6 +549,47 @@ function getSegmentPosition(offset: number, lineLength: number, segmentCount: nu
     segmentIndex,
     pointOffset: offset - segmentIndex * lineLength,
   }
+}
+
+function buildEventRanges(
+  events: TimelineEvent[],
+  segments: SegmentLayout[],
+  direction: TimelineDocument['settings']['direction'],
+  minDate: number,
+  maxDate: number,
+  cumulativeLength: number,
+  lineLength: number,
+): EventRangeLayout[] {
+  return events.flatMap((event) => {
+    if (!event.endDate || new Date(event.endDate).getTime() <= new Date(event.date).getTime()) {
+      return []
+    }
+
+    const startOffset = getAbsoluteOffset(event.date, minDate, maxDate, cumulativeLength)
+    const endOffset = getAbsoluteOffset(event.endDate, minDate, maxDate, cumulativeLength)
+    const ranges: EventRangeLayout[] = []
+    let cursor = startOffset
+
+    while (cursor < endOffset) {
+      const segmentIndex = Math.min(segments.length - 1, Math.floor(cursor / lineLength))
+      const segment = segments[segmentIndex]
+      const segmentStartOffset = segmentIndex * lineLength
+      const rangeStart = cursor - segmentStartOffset
+      const rangeEnd = Math.min(endOffset, segmentStartOffset + lineLength) - segmentStartOffset
+
+      ranges.push({
+        eventId: event.id,
+        segmentIndex,
+        startX: direction === 'horizontal' ? segment.axisStartX + rangeStart : segment.axisStartX,
+        startY: direction === 'horizontal' ? segment.axisStartY : segment.axisStartY + rangeStart,
+        endX: direction === 'horizontal' ? segment.axisStartX + rangeEnd : segment.axisStartX,
+        endY: direction === 'horizontal' ? segment.axisStartY : segment.axisStartY + rangeEnd,
+      })
+      cursor = segmentStartOffset + lineLength
+    }
+
+    return ranges
+  })
 }
 
 function getMajorTickTimestamps(start: number, end: number, unit: TimelineTickUnit) {
@@ -681,6 +742,7 @@ function normalizeLayoutBounds(
   segments: SegmentLayout[],
   events: EventLayout[],
   ticks: TickLayout[],
+  ranges: EventRangeLayout[],
 ) {
   let minX = Number.POSITIVE_INFINITY
   let minY = Number.POSITIVE_INFINITY
@@ -749,6 +811,13 @@ function normalizeLayoutBounds(
       ...tick,
       x: tick.x + offsetX,
       y: tick.y + offsetY,
+    })),
+    ranges: ranges.map((range) => ({
+      ...range,
+      startX: range.startX + offsetX,
+      startY: range.startY + offsetY,
+      endX: range.endX + offsetX,
+      endY: range.endY + offsetY,
     })),
   }
 }
