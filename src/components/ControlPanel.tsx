@@ -90,9 +90,10 @@ function ControlPanel({
         </div>
       </div>
 
-      <div className="panel-section">
-        <div className="split-header">
-          <h2>Timeline</h2>
+      <details className="panel-section collapsible-panel" open>
+        <summary>Timeline</summary>
+        <div className="split-header panel-section-action">
+          <span />
           <button type="button" className="ghost" onClick={onFitBoundsToEvents}>
             Fit to events
           </button>
@@ -231,10 +232,10 @@ function ControlPanel({
             <span>Grid and major ticks</span>
           </label>
         </div>
-      </div>
+      </details>
 
-      <div className="panel-section">
-        <h2>Theme</h2>
+      <details className="panel-section collapsible-panel" open>
+        <summary>Theme</summary>
         <div className="color-row">
           {(
             [
@@ -256,13 +257,10 @@ function ControlPanel({
             />
           ))}
         </div>
-      </div>
+      </details>
 
-      <div className="panel-section">
-        <div className="split-header">
-          <h2>Events</h2>
-          <span>{documentState.events.length}</span>
-        </div>
+      <details className="panel-section collapsible-panel" open>
+        <summary>Events <span>{documentState.events.length}</span></summary>
         <div className="event-list compact-list">
           {documentState.events
             .slice()
@@ -279,11 +277,12 @@ function ControlPanel({
               </button>
             ))}
         </div>
-      </div>
+      </details>
 
-      <div className="panel-section">
-        <div className="split-header">
-          <h2>Zoom sections</h2>
+      <details className="panel-section collapsible-panel" open>
+        <summary>Zoom sections <span>{documentState.zoomSections.length}</span></summary>
+        <div className="split-header panel-section-action">
+          <span />
           <button type="button" className="ghost" onClick={onAddZoomSection}>
             Add zoom
           </button>
@@ -367,10 +366,10 @@ function ControlPanel({
             ))}
           </div>
         )}
-      </div>
+      </details>
 
-      <div className="panel-section">
-        <h2>Import / export</h2>
+      <details className="panel-section collapsible-panel" open>
+        <summary>Import / export</summary>
         <div className="toolbar wrap">
           <button type="button" onClick={() => onExportDocument('yaml')}>
             Export YAML
@@ -408,7 +407,7 @@ function ControlPanel({
           accept=".yaml,.yml,.json,.timeline.yaml,.timeline.json"
           onChange={onImportFile}
         />
-      </div>
+      </details>
     </aside>
   )
 }

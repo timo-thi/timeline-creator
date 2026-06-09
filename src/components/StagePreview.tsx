@@ -1,4 +1,4 @@
-import { type CSSProperties, type PointerEvent, useRef } from 'react'
+import { type CSSProperties, type PointerEvent, useRef, useState } from 'react'
 import { safeFilename } from '../lib/document'
 import type { EventLayout, TimelineDocument, TimelineEvent, TimelineLayout } from '../types'
 import { exportSvgElement } from '../utils/export'
@@ -42,6 +42,7 @@ function StagePreview({
 }: StagePreviewProps) {
   const svgRef = useRef<SVGSVGElement | null>(null)
   const exportSurfaceRef = useRef<HTMLDivElement | null>(null)
+  const [isCollapsed, setIsCollapsed] = useState(false)
 
   async function exportImage(format: 'png' | 'jpg' | 'svg', includeBackground: boolean) {
     if (!svgRef.current) {
@@ -60,7 +61,7 @@ function StagePreview({
   }
 
   return (
-    <section className="stage preview-section">
+    <section className={isCollapsed ? 'stage preview-section collapsed' : 'stage preview-section'}>
       <header className="stage-header">
         <div>
           <p className="eyebrow">{sectionId === 'main' ? 'Main preview' : 'Zoom preview'}</p>
@@ -78,14 +79,21 @@ function StagePreview({
           </p>
         </div>
         <div className="toolbar">
-          <button type="button" onClick={() => void exportImage('png', true)}>PNG</button>
-          <button type="button" onClick={() => void exportImage('png', false)}>PNG transparent</button>
-          <button type="button" onClick={() => void exportImage('jpg', true)}>JPG</button>
-          <button type="button" onClick={() => void exportImage('svg', true)}>SVG</button>
+          {!isCollapsed ? (
+            <>
+              <button type="button" onClick={() => void exportImage('png', true)}>PNG</button>
+              <button type="button" onClick={() => void exportImage('png', false)}>PNG transparent</button>
+              <button type="button" onClick={() => void exportImage('jpg', true)}>JPG</button>
+              <button type="button" onClick={() => void exportImage('svg', true)}>SVG</button>
+            </>
+          ) : null}
+          <button type="button" className="ghost" onClick={() => setIsCollapsed((current) => !current)}>
+            {isCollapsed ? 'Expand' : 'Collapse'}
+          </button>
         </div>
       </header>
 
-      <div className="canvas-frame compact-frame">
+      {!isCollapsed ? <div className="canvas-frame compact-frame">
         <div
           ref={exportSurfaceRef}
           className="export-surface"
@@ -410,9 +418,9 @@ function StagePreview({
           })}
           </svg>
         </div>
-      </div>
+      </div> : null}
 
-      <section className="legend compact-legend">
+      {!isCollapsed ? <section className="legend compact-legend">
         <div>
           <strong>Bounds</strong>
           <span>Events are mapped inside the explicit start and end timestamps.</span>
@@ -425,7 +433,7 @@ function StagePreview({
           <strong>Edit</strong>
           <span>Open an event from the list or double-click a card to edit it in the drawer.</span>
         </div>
-      </section>
+      </section> : null}
     </section>
   )
 }
